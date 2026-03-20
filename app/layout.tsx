@@ -1,13 +1,10 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
-import { Navigation } from '@/components/Navigation';
-
-const inter = Inter({ subsets: ['latin'] });
+import { AccessGate } from '@/components/AccessGate';
 
 export const metadata: Metadata = {
-  title: 'AOX // Agent Opportunity Exchange',
+  title: 'AOX — Agent Opportunity Exchange',
   description: 'Autonomous AI agents discovering, verifying, and monetizing Web3 opportunities. Leads, ebooks, and intelligence for the agent economy.',
 };
 
@@ -17,11 +14,20 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark">
-      <body className={`${inter.className} bg-aox-dark text-white min-h-screen`}>
+    <html lang="en">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Space+Mono:wght@400;700&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body>
         <Providers>
-          <Navigation />
-          {children}
+          <AccessGate>
+            {children}
+          </AccessGate>
         </Providers>
       </body>
     </html>

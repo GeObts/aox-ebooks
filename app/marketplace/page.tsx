@@ -1,191 +1,224 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import Link from 'next/link';
-import { useAccount, useConnect, useDisconnect, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { parseUnits } from 'viem';
-import { TOKENS, TokenKey, ERC20_ABI, MARKETPLACE_WALLET } from '@/lib/contracts';
+import { useAccount, useWriteContract, useSendTransaction } from 'wagmi';
+import { parseUnits, parseEther } from 'viem';
+import { TOKENS, type TokenKey, ERC20_ABI, MARKETPLACE_WALLET } from '@/lib/contracts';
+import { leads, revealData, type Lead, type LeadReveal } from '@/lib/leads';
+import { CustomCursor } from '@/components/CustomCursor';
+import { WalletConnect } from '@/components/WalletConnect';
+import { Notification, useNotification } from '@/components/Notification';
 
-const leads = [
-  { id: 'nft-4829', category: 'NFT Launch', title: 'Pixel Agents Genesis', desc: 'AI-generated PFP collection with staking mechanics. Team verified, contract audited.', score: 87, price: 25, chain: 'Base', badge: 'hot' },
-  { id: 'defi-2847', category: 'DeFi Protocol', title: 'Yield Aggregator v2', desc: 'Auto-compounding vaults for Base ecosystem. $2M TVL, 12% APY.', score: 92, price: 50, chain: 'Base', badge: 'verified' },
-  { id: 'token-1923', category: 'Token Launch', title: 'Agent Token ($AGNT)', desc: 'Governance token for AI agent marketplace. Fair launch, no VC.', score: 78, price: 20, chain: 'Base', badge: 'new' },
-  { id: 'nft-3912', category: 'NFT Launch', title: 'Base Nouns Fork', desc: 'Daily auctions, 100% on-chain. Community treasury building.', score: 85, price: 30, chain: 'Base' },
-  { id: 'defi-4521', category: 'DeFi Protocol', title: 'Lending Protocol Beta', desc: 'Isolated lending markets for long-tail assets. Testnet live.', score: 81, price: 35, chain: 'Base' },
-  { id: 'misc-1029', category: 'Misc', title: 'DAO Tooling Suite', desc: 'On-chain voting + treasury management. Snapshot alternative.', score: 76, price: 15, chain: 'Base' },
-  { id: 'token-3847', category: 'Token Launch', title: 'Meme Coin Launchpad', desc: 'Fair launch mechanism with bonding curves. Anti-rug features.', score: 72, price: 10, chain: 'Base' },
-  { id: 'nft-5621', category: 'NFT Launch', title: 'Generative Art Series', desc: 'Algorithmic art on Base. 500 unique pieces, provenance on-chain.', score: 88, price: 40, chain: 'Base', badge: 'verified' },
-];
+type ModalStep = 'select' | 'processing' | 'success' | 'error';
+
+function buildLeadText(lead: Lead, reveal: LeadReveal, txHash: string): string {
+  const now = new Date().toISOString();
+  let text = `Lead Delivered\n`;
+  text += `Listing: ${lead.title}\n`;
+  text += `Transaction: ${txHash}\n`;
+  text += `Delivered At: ${now}\n`;
+  text += `Score: ${lead.score}/100\n`;
+  text += `Category: ${lead.category}\n`;
+  text += `Chain: ${lead.chain}\n`;
+  text += `\n--- Contact Details ---\n\n`;
+  for (const f of reveal.fields) {
+    text += `${f.label}: ${f.value}\n`;
+  }
+  return text;
+}
 
 export default function Marketplace() {
-  const { address, isConnected } = useAccount();
-  const { connect, connectors, isPending: connectPending } = useConnect();
-  const { disconnect } = useDisconnect();
-  const { writeContract, data: hash, isPending: txPending } = useWriteContract();
-  const { isLoading: confirming } = useWaitForTransactionReceipt({ hash });
-  
-  const [filter, setFilter] = useState('ALL');
-  const [selectedLead, setSelectedLead] = useState<typeof leads[0] | null>(null);
-  const [selectedToken, setSelectedToken] = useState<TokenKey>('USDC');
-  const [step, setStep] = useState<'select' | 'processing' | 'success' | 'error'>('select');
+  const { isConnected } = useAccount();
+  const { writeContractAsync } = useWriteContract();
+  const { sendTransactionAsync } = useSendTransaction();
+  const { ref: notifRef, show: showNotif } = useNotification();
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [currentLead, setCurrentLead] = useState<Lead | null>(null);
+  const [selectedToken, setSelectedToken] = useState<TokenKey | 'ETH'>('USDC');
+  const [modalStep, setModalStep] = useState<ModalStep>('select');
   const [errorMsg, setErrorMsg] = useState('');
+  const [txHash, setTxHash] = useState('');
 
-  const handleConnect = () => {
-    const coinbaseConnector = connectors.find((c) => c.id === 'coinbaseWallet');
-    if (coinbaseConnector) connect({ connector: coinbaseConnector });
-  };
+  const openModal = useCallback((leadId: string) => {
+    const lead = leads.find((l) => l.id === leadId);
+    if (!lead) return;
+    setCurrentLead(lead);
+    setModalStep('select');
+    setSelectedToken('USDC');
+    setTxHash('');
+    setErrorMsg('');
+    setModalOpen(true);
+  }, []);
 
-  const formatAddress = (addr: string) => `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+  const closeModal = useCallback(() => {
+    setModalOpen(false);
+    setCurrentLead(null);
+  }, []);
 
-  const filteredLeads = filter === 'ALL' ? leads : leads.filter(l => 
-    filter === 'NFT' ? l.category.includes('NFT') :
-    filter === 'DEFI' ? l.category.includes('DeFi') :
-    filter === 'TOKEN' ? l.category.includes('Token') :
-    filter === 'MISC' ? l.category === 'Misc' : true
-  );
-
-  const buyLead = (lead: typeof leads[0]) => {
-    if (!isConnected) {
-      handleConnect();
+  const executePurchase = useCallback(async () => {
+    if (!currentLead || !isConnected) {
+      showNotif('// connect wallet first', true);
       return;
     }
-    setSelectedLead(lead);
-    setStep('select');
-  };
 
-  const executePurchase = () => {
-    if (!selectedLead) return;
-    setStep('processing');
-    
-    const token = TOKENS[selectedToken];
-    const amount = parseUnits(selectedLead.price.toString(), token.decimals);
+    setModalStep('processing');
 
-    writeContract({
-      address: token.address as `0x${string}`,
-      abi: ERC20_ABI,
-      functionName: 'transfer',
-      args: [MARKETPLACE_WALLET as `0x${string}`, amount],
-    }, {
-      onSuccess: () => setStep('success'),
-      onError: (err) => {
-        setErrorMsg(err.message || 'Transaction failed');
-        setStep('error');
-      },
+    try {
+      let hash: string;
+
+      if (selectedToken === 'ETH') {
+        const ethPrice = 2000;
+        const value = parseEther((currentLead.price / ethPrice).toFixed(6));
+        hash = await sendTransactionAsync({
+          to: MARKETPLACE_WALLET as `0x${string}`,
+          value,
+        });
+      } else {
+        const token = TOKENS[selectedToken];
+        const amount = parseUnits(currentLead.price.toString(), token.decimals);
+        hash = await writeContractAsync({
+          address: token.address as `0x${string}`,
+          abi: ERC20_ABI,
+          functionName: 'transfer',
+          args: [MARKETPLACE_WALLET as `0x${string}`, amount],
+        });
+      }
+
+      setTxHash(hash);
+      await new Promise((r) => setTimeout(r, 800));
+      setModalStep('success');
+      showNotif('// lead purchased \u2014 content unlocked');
+    } catch (e: any) {
+      const msg = e?.message?.includes('Insufficient') ? '// insufficient balance' : '// transaction rejected';
+      setErrorMsg(e?.message || 'Transaction failed');
+      setModalStep('error');
+      showNotif(msg, true);
+    }
+  }, [currentLead, isConnected, selectedToken, writeContractAsync, sendTransactionAsync, showNotif]);
+
+  const reveal: LeadReveal | null = currentLead ? revealData[currentLead.id] || null : null;
+
+  const copyLeadDetails = useCallback(() => {
+    if (!currentLead || !reveal) return;
+    const text = buildLeadText(currentLead, reveal, txHash);
+    navigator.clipboard.writeText(text).then(() => {
+      showNotif('// lead details copied to clipboard');
+    }).catch(() => {
+      showNotif('// copy failed \u2014 select and copy manually', true);
     });
-  };
+  }, [currentLead, reveal, txHash, showNotif]);
+
+  const downloadLeadDetails = useCallback(() => {
+    if (!currentLead || !reveal) return;
+    const text = buildLeadText(currentLead, reveal, txHash);
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `aox-lead-${currentLead.id}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showNotif('// lead details downloaded');
+  }, [currentLead, reveal, txHash, showNotif]);
+
+  const [txExpanded, setTxExpanded] = useState(false);
 
   return (
-    <div style={{ background: 'var(--dark)', minHeight: '100vh' }}>
+    <>
+      <CustomCursor />
+
       {/* Nav */}
       <nav>
-        <Link href="/" className="nav-logo" style={{ textDecoration: 'none', color: 'white' }}>A<span>O</span>X</Link>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <Link href="/" className="nav-logo">A<span>O</span>X</Link>
+        <div className="nav-right">
           <div className="nav-status">
-            <div className="status-dot"></div>
+            <div className="status-dot" />
             MARKETPLACE LIVE
           </div>
-          <button 
-            className="btn-primary"
-            onClick={isConnected ? () => disconnect() : handleConnect}
-            disabled={connectPending}
-          >
-            {connectPending ? 'Connecting...' : isConnected ? formatAddress(address!) : 'Connect Wallet'}
-          </button>
+          <WalletConnect />
         </div>
       </nav>
 
       {/* Hero */}
-      <div style={{ paddingTop: '100px', textAlign: 'center', padding: '120px 40px 60px' }}>
-        <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: '10px', color: 'var(--muted)', letterSpacing: '0.3em', marginBottom: '16px' }}>
-          // AOX MARKETPLACE — VERIFIED WEB3 INTELLIGENCE
-        </div>
-        <h1 style={{ fontSize: 'clamp(32px, 5vw, 56px)', fontWeight: 800, lineHeight: 1.1, marginBottom: '16px' }}>
+      <div className="mp-hero">
+        <div className="hero-label">// AOX MARKETPLACE {'\u2014'} VERIFIED WEB3 INTELLIGENCE</div>
+        <h1 className="mp-hero-title">
           Buy verified leads.<br />
-          Pay in <span style={{ color: 'var(--orange)' }}>USDC, ETH, $BNKR & more.</span><br />
+          Pay in <span>USDC.</span><br />
           Settle on Base.
         </h1>
-        <p style={{ color: 'var(--muted)', fontSize: '14px', marginBottom: '40px' }}>
-          Pay with USDC, ETH, WETH, USDT, or $BNKR via x402 + Permit2 on Base.
+        <p className="hero-sub">
+          Pay with USDC on Base. Unlock verified intelligence instantly.
         </p>
-
-        {/* Stats */}
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '40px', flexWrap: 'wrap' }}>
-          {[
-            { val: '47', lbl: 'LEADS AVAILABLE' },
-            { val: '12', lbl: 'SOLD TODAY' },
-            { val: 'MULTI', lbl: 'PAYMENT TOKENS' },
-            { val: 'BASE', lbl: 'NETWORK' },
-          ].map((s, i) => (
-            <div key={i} style={{ textAlign: 'center' }}>
-              <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: '28px', fontWeight: 600 }}>{s.val}</div>
-              <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: '10px', color: 'var(--muted)', letterSpacing: '0.1em' }}>{s.lbl}</div>
-            </div>
-          ))}
+        <div className="stats-bar">
+          <div className="stat">
+            <span className="stat-val">47</span>
+            <span className="stat-lbl">LEADS AVAILABLE</span>
+          </div>
+          <div className="stat">
+            <span className="stat-val">12</span>
+            <span className="stat-lbl">SOLD TODAY</span>
+          </div>
+          <div className="stat">
+            <span className="stat-val">MULTI</span>
+            <span className="stat-lbl">PAYMENT TOKENS</span>
+          </div>
+          <div className="stat">
+            <span className="stat-val">BASE</span>
+            <span className="stat-lbl">NETWORK</span>
+          </div>
         </div>
       </div>
 
       {/* Filters */}
-      <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', padding: '0 40px 40px', flexWrap: 'wrap' }}>
-        {['ALL', 'NFT', 'DEFI', 'TOKEN', 'MISC'].map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            style={{
-              padding: '8px 16px',
-              fontFamily: 'ui-monospace, monospace',
-              fontSize: '11px',
-              background: filter === f ? 'var(--orange)' : 'var(--dark2)',
-              color: filter === f ? '#080808' : 'var(--muted)',
-              border: '1px solid var(--border)',
-              cursor: 'pointer',
-              textTransform: 'uppercase',
-              letterSpacing: '0.1em',
-            }}
-          >
-            {f}
-          </button>
-        ))}
-        <Link href="/ebooks" style={{ padding: '8px 16px', fontFamily: 'ui-monospace, monospace', fontSize: '11px', background: 'var(--dark2)', color: 'var(--muted)', border: '1px solid var(--border)', textDecoration: 'none', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-          EBOOKS ↗
-        </Link>
-        <span style={{ marginLeft: 'auto', fontFamily: 'ui-monospace, monospace', fontSize: '11px', color: 'var(--muted)' }}>
-          {filteredLeads.length} leads
-        </span>
+      <div className="filters">
+        <Link href="/marketplace" className="filter-btn active">ALL</Link>
+        <Link href="/nft" className="filter-btn">NFT</Link>
+        <Link href="/defi" className="filter-btn">DEFI</Link>
+        <Link href="/token" className="filter-btn">TOKEN</Link>
+        <Link href="/misc" className="filter-btn">MISC</Link>
+        <Link href="/polymarket" className="filter-btn">POLYMARKET</Link>
+        <Link href="/ebooks" className="filter-btn">EBOOKS {'\u2197'}</Link>
+        <span className="filter-count">{leads.length} leads</span>
       </div>
 
       {/* Leads Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px', padding: '0 40px 60px' }}>
-        {filteredLeads.map((lead) => (
-          <div key={lead.id} style={{ background: 'var(--dark2)', border: '1px solid var(--border)', padding: '24px', borderRadius: '4px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-              <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: '10px', color: 'var(--muted)', textTransform: 'uppercase' }}>{lead.category}</span>
-              {lead.badge && (
-                <span style={{ 
-                  fontFamily: 'ui-monospace, monospace', 
-                  fontSize: '10px', 
-                  padding: '2px 8px', 
-                  background: lead.badge === 'hot' ? 'rgba(239,68,68,0.2)' : 'rgba(102,200,0,0.2)',
-                  color: lead.badge === 'hot' ? '#ef4444' : '#66c800',
-                  borderRadius: '2px',
-                  textTransform: 'uppercase'
-                }}>
-                  {lead.badge}
-                </span>
-              )}
+      <div className="leads-grid">
+        {leads.map((lead) => (
+          <div className="lead-card" key={lead.id}>
+            <div className={`tier-badge ${lead.tier}`}>{lead.tier.toUpperCase()}</div>
+            <div className="lead-header">
+              <span className="lead-category">{lead.category}</span>
+              <div className="lead-score">
+                <div className="score-bar">
+                  <div className="score-fill" style={{ width: `${lead.score}%` }} />
+                </div>
+                <span className="score-num">{lead.score}</span>
+              </div>
             </div>
-            <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '8px' }}>{lead.title}</h3>
-            <p style={{ fontSize: '13px', color: 'var(--muted)', marginBottom: '16px', lineHeight: 1.5 }}>{lead.desc}</p>
-            <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
-              <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: '11px', color: 'var(--muted)' }}>Score: {lead.score}</span>
-              <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: '11px', color: 'var(--muted)' }}>{lead.chain}</span>
+            <div className="lead-title">{lead.title}</div>
+            <div className="lead-desc">{lead.desc}</div>
+            <div className="lead-meta">
+              <div className="meta-item"><div className="meta-dot" />{lead.wallet_age} wallet</div>
+              <div className="meta-item"><div className="meta-dot" />{lead.liquidity} liquidity</div>
+              <div className="meta-item"><div className="meta-dot" />{lead.contacts} contacts</div>
+              <div className="meta-item"><div className="meta-dot" />{lead.timestamp}</div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
-              <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: '20px', fontWeight: 700, color: 'var(--orange)' }}>${lead.price}</span>
-              <button 
-                className="btn-primary"
-                onClick={() => buyLead(lead)}
+            <div className="lead-footer">
+              <div className="lead-price">
+                <span className="price-amount">{lead.price} USDC</span>
+                <span className="price-token">USDC ON BASE</span>
+              </div>
+              <button
+                className="buy-btn"
+                disabled
+                style={{ background: 'var(--dark3)', color: 'var(--muted)', border: '1px solid var(--border)', cursor: 'not-allowed' }}
               >
-                Buy →
+                Coming Soon
               </button>
             </div>
           </div>
@@ -193,32 +226,34 @@ export default function Marketplace() {
       </div>
 
       {/* Agent API Section */}
-      <div style={{ borderTop: '1px solid var(--border)', padding: '80px 40px' }}>
-        <div style={{ maxWidth: '1000px', margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '60px', alignItems: 'center' }}>
+      <div className="agent-section">
+        <div className="agent-inner">
           <div>
-            <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: '10px', color: 'var(--orange)', letterSpacing: '0.2em', marginBottom: '12px' }}>// FOR AI AGENTS</div>
-            <h2 style={{ fontSize: '32px', fontWeight: 800, marginBottom: '16px' }}>
-              Agents buy<br />leads <span style={{ color: 'var(--cyan)' }}>autonomously.</span>
-            </h2>
-            <p style={{ fontSize: '14px', color: 'var(--muted)', lineHeight: 1.7, marginBottom: '16px' }}>
-              No wallet UI needed. AOX speaks x402 — the HTTP payment standard built for autonomous agents. Send a GET request, receive a 402 Payment Required with $BNKR payment details. Sign the Permit2 authorization. POST the signature. Lead delivered as JSON.
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--orange)', letterSpacing: '0.2em', marginBottom: '12px' }}>// FOR AI AGENTS</div>
+            <h2 className="agent-title">Agents buy<br />leads <span>autonomously.</span></h2>
+            <p className="agent-desc">
+              No wallet UI needed. AOX speaks x402 {'\u2014'} the HTTP payment standard built for autonomous agents. Send a GET request, receive a 402 Payment Required with USDC payment details. Sign the authorization. POST the signature. Lead delivered as JSON.
             </p>
-            <p style={{ fontSize: '14px', color: 'var(--muted)', lineHeight: 1.7 }}>
+            <p className="agent-desc">
               Any AI agent on any framework can purchase leads with zero human involvement. This is what the agent economy looks like.
             </p>
           </div>
-          <div style={{ background: 'var(--dark2)', border: '1px solid var(--border)', borderRadius: '4px', overflow: 'hidden' }}>
-            <div style={{ background: 'var(--dark3)', padding: '12px 16px', fontFamily: 'ui-monospace, monospace', fontSize: '10px', color: 'var(--muted)', borderBottom: '1px solid var(--border)' }}>
-              // x402 AGENT FLOW — aox.llc
-            </div>
-            <div style={{ padding: '20px', fontFamily: 'ui-monospace, monospace', fontSize: '12px' }}>
-              <div style={{ color: 'var(--muted)' }}># Step 1 — Request lead</div>
-              <div><span style={{ color: 'var(--orange)' }}>GET</span> /lead?id=nft-4829</div>
-              <div style={{ color: 'var(--muted)' }}># → 402 Payment Required</div>
-              <div style={{ marginTop: '12px', color: 'var(--muted)' }}># Response includes:</div>
-              <div><span style={{ color: 'var(--cyan)' }}>"asset"</span>: <span style={{ color: '#66c800' }}>"0x22af33...76f3b"</span></div>
-              <div><span style={{ color: 'var(--cyan)' }}>"amount"</span>: <span style={{ color: '#66c800' }}>"1 BNKR"</span></div>
-              <div><span style={{ color: 'var(--cyan)' }}>"scheme"</span>: <span style={{ color: '#66c800' }}>"permit2"</span></div>
+          <div className="agent-terminal">
+            <div className="term-header">// x402 AGENT FLOW {'\u2014'} aox.llc</div>
+            <div className="term-body">
+              <div><span className="t-comment"># Step 1 {'\u2014'} Request lead</span></div>
+              <div><span className="t-orange">GET</span> /lead?id=nft-4829</div>
+              <div><span className="t-comment"># {'\u2192'} 402 Payment Required</span></div>
+              <div style={{ marginTop: '8px' }}><span className="t-comment"># Response includes:</span></div>
+              <div><span className="t-key">&quot;asset&quot;</span>: <span className="t-val">&quot;0x22af33...76f3b&quot;</span></div>
+              <div><span className="t-key">&quot;amount&quot;</span>: <span className="t-val">&quot;25 USDC&quot;</span></div>
+              <div><span className="t-key">&quot;scheme&quot;</span>: <span className="t-val">&quot;erc20-transfer&quot;</span></div>
+              <div style={{ marginTop: '8px' }}><span className="t-comment"># Step 2 {'\u2014'} Sign & pay</span></div>
+              <div><span className="t-orange">POST</span> /lead/purchase?id=nft-4829</div>
+              <div><span className="t-key">X-PAYMENT-SIGNATURE</span>: <span className="t-val">0x...</span></div>
+              <div style={{ marginTop: '8px' }}><span className="t-comment"># Step 3 {'\u2014'} Lead delivered</span></div>
+              <div><span className="t-green">{'\u2713'} 200 OK {'\u2014'} lead data returned</span></div>
+              <div><span className="t-green">{'\u2713'} USDC forwarded to treasury</span><span className="t-comment"> {'\u25A0'}</span></div>
             </div>
           </div>
         </div>
@@ -226,126 +261,164 @@ export default function Marketplace() {
 
       {/* Footer */}
       <footer>
-        <div className="footer-logo">A<span>O</span>X</div>
-        <div className="footer-copy">© 2026 AOX — AGENT OPPORTUNITY EXCHANGE</div>
-        <div className="footer-links">
-          <a href="https://x.com/PupAIOnBase" target="_blank" rel="noopener noreferrer">TWITTER</a>
-          <a href="#">FARCASTER</a>
-          <a href="#">DOCS</a>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--muted)' }}>A<span style={{ color: 'var(--orange)' }}>O</span>X {'\u2014'} AGENT OPPORTUNITY EXCHANGE</div>
+        <div style={{ display: 'flex', gap: '24px', fontFamily: 'var(--mono)', fontSize: '11px' }}>
+          <Link href="/" style={{ color: 'var(--muted)', textDecoration: 'none', letterSpacing: '0.1em' }}>HOME</Link>
+          <a href="https://x.com/AOXexchange" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--muted)', textDecoration: 'none', letterSpacing: '0.1em' }}>TWITTER</a>
+          <a href="#" style={{ color: 'var(--muted)', textDecoration: 'none', letterSpacing: '0.1em' }}>DOCS</a>
         </div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--muted)' }}>{'\u00A9'} 2026 AOX {'\u2014'} BASE MAINNET</div>
       </footer>
 
       {/* Purchase Modal */}
-      {selectedLead && (
-        <div 
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
-          onClick={() => setSelectedLead(null)}
-        >
-          <div 
-            style={{ background: 'var(--dark2)', border: '1px solid var(--border)', padding: '32px', maxWidth: '400px', width: '90%' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {step === 'select' && (
-              <>
-                <h3 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>Purchase Lead</h3>
-                <p style={{ fontSize: '13px', color: 'var(--muted)', marginBottom: '24px' }}>Instant access after payment confirms on Base.</p>
-                
-                <div style={{ marginBottom: '16px' }}>
-                  <span style={{ color: 'var(--muted)' }}>Lead: </span>
-                  <span>{selectedLead.title}</span>
+      <div className={`modal-overlay${modalOpen ? ' show' : ''}`} onClick={closeModal}>
+        <div className={`modal${modalStep === 'success' ? ' modal-wide' : ''}`} onClick={(e) => e.stopPropagation()}>
+          <button className="modal-close" onClick={closeModal}>{'\u00D7'}</button>
+
+          {modalStep === 'select' && currentLead && (
+            <>
+              <div className="modal-title">Purchase Lead</div>
+              <div className="modal-sub">You are purchasing verified Web3 intelligence. Payment settles on Base mainnet.</div>
+              <div className="modal-row"><span className="modal-row-label">LEAD</span><span className="modal-row-val">{currentLead.title}</span></div>
+              <div className="modal-row"><span className="modal-row-label">SCORE</span><span className="modal-row-val" style={{ color: 'var(--green)' }}>{currentLead.score}/100</span></div>
+              <div className="modal-row"><span className="modal-row-label">CONTACTS</span><span className="modal-row-val">{currentLead.contacts} verified</span></div>
+              <div className="modal-row"><span className="modal-row-label">PRICE</span><span className="modal-row-val orange">{currentLead.price} USDC</span></div>
+              <div className="modal-row"><span className="modal-row-label">NETWORK</span><span className="modal-row-val">Base Mainnet</span></div>
+              <div className="modal-row"><span className="modal-row-label">PAYMENT</span><span className="modal-row-val">USDC on Base</span></div>
+
+              <div style={{ margin: '16px 0 8px', fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--muted)', letterSpacing: '0.1em' }}>// SELECT PAYMENT TOKEN</div>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '20px' }}>
+                {(['USDC', 'USDT', 'DAI', 'WETH', 'BNKR', 'ETH'] as const).map((t) => (
+                  <button
+                    key={t}
+                    className={`tok-btn${selectedToken === t ? ' active' : ''}`}
+                    onClick={() => setSelectedToken(t)}
+                  >
+                    {t === 'BNKR' ? '$BNKR' : t}
+                  </button>
+                ))}
+              </div>
+
+              <div className="modal-actions">
+                <button className="modal-cancel" onClick={closeModal}>Cancel</button>
+                <button className="modal-confirm" onClick={executePurchase}>
+                  Pay {currentLead.price} {selectedToken} {'\u2192'}
+                </button>
+              </div>
+            </>
+          )}
+
+          {modalStep === 'processing' && (
+            <div style={{ textAlign: 'center', padding: '40px 0' }}>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '13px', color: 'var(--orange)', marginBottom: '16px' }}>PROCESSING PAYMENT</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--muted)', lineHeight: 2 }}>
+                <div>{'\u2192'} Requesting x402 payment details...</div>
+                <div>{'\u2192'} Signing Permit2 authorization...</div>
+                <div>{'\u2192'} Submitting payment to Base...</div>
+                <div style={{ opacity: 0.3 }}>{'\u2192'} Verifying & delivering lead...</div>
+              </div>
+            </div>
+          )}
+
+          {modalStep === 'success' && currentLead && reveal && (
+            <div className="delivery-panel">
+              <div className="delivery-header">
+                <div className="delivery-icon">{'\u2713'}</div>
+                <div className="delivery-title">Lead Delivered</div>
+              </div>
+              <div className="delivery-notice">
+                Your purchased lead details are shown below.
+              </div>
+              <div className="delivery-warning">
+                {'\u26A0'} Copy or download this data now. It may not be shown again after closing this window.
+              </div>
+
+              {/* Transaction Info */}
+              <div className="delivery-tx-section">
+                <div className="delivery-row">
+                  <span className="delivery-row-label">LISTING</span>
+                  <span className="delivery-row-val">{currentLead.title}</span>
                 </div>
-                <div style={{ marginBottom: '16px' }}>
-                  <span style={{ color: 'var(--muted)' }}>Price: </span>
-                  <span style={{ color: 'var(--orange)', fontWeight: 700 }}>${selectedLead.price}</span>
+                <div className="delivery-row">
+                  <span className="delivery-row-label">SCORE</span>
+                  <span className="delivery-row-val" style={{ color: 'var(--green)' }}>{currentLead.score}/100</span>
                 </div>
-                
-                <div style={{ marginBottom: '24px' }}>
-                  <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: '10px', color: 'var(--muted)', marginBottom: '8px' }}>// SELECT TOKEN</div>
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                    {(Object.keys(TOKENS) as TokenKey[]).map((t) => (
-                      <button
-                        key={t}
-                        onClick={() => setSelectedToken(t)}
-                        style={{
-                          padding: '6px 12px',
-                          fontFamily: 'ui-monospace, monospace',
-                          fontSize: '11px',
-                          background: selectedToken === t ? 'var(--orange)' : 'var(--dark3)',
-                          color: selectedToken === t ? '#080808' : 'var(--muted)',
-                          border: '1px solid var(--border)',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        {t === 'BNKR' ? '$BNKR' : t}
-                      </button>
-                    ))}
+                <div className="delivery-row">
+                  <span className="delivery-row-label">CATEGORY</span>
+                  <span className="delivery-row-val">{currentLead.category}</span>
+                </div>
+                <div className="delivery-row">
+                  <span className="delivery-row-label">CHAIN</span>
+                  <span className="delivery-row-val">{currentLead.chain}</span>
+                </div>
+                {txHash && (
+                  <div className="delivery-row">
+                    <span className="delivery-row-label">TX HASH</span>
+                    <span className="delivery-row-val delivery-tx-val">
+                      {txExpanded ? (
+                        <span className="delivery-tx-full" onClick={() => setTxExpanded(false)}>{txHash}</span>
+                      ) : (
+                        <span className="delivery-tx-short" onClick={() => setTxExpanded(true)}>
+                          {txHash.slice(0, 10)}...{txHash.slice(-8)}
+                          <span className="delivery-tx-expand"> [expand]</span>
+                        </span>
+                      )}
+                    </span>
                   </div>
-                </div>
-                
-                <div style={{ display: 'flex', gap: '12px' }}>
-                  <button 
-                    onClick={() => setSelectedLead(null)}
-                    style={{ flex: 1, padding: '12px', background: 'var(--dark3)', border: '1px solid var(--border)', color: 'white', cursor: 'pointer' }}
-                  >
-                    Cancel
-                  </button>
-                  <button 
-                    className="btn-primary"
-                    onClick={executePurchase}
-                    disabled={txPending}
-                    style={{ flex: 1 }}
-                  >
-                    {txPending ? 'Confirming...' : 'Pay Now →'}
-                  </button>
-                </div>
-              </>
-            )}
-            
-            {step === 'processing' && (
-              <div style={{ textAlign: 'center', padding: '40px 0' }}>
-                <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: '14px', color: 'var(--orange)', marginBottom: '16px' }}>
-                  PROCESSING {selectedToken} PAYMENT
-                </div>
-                <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: '12px', color: 'var(--muted)' }}>
-                  <div style={{ marginBottom: '8px', opacity: hash ? 1 : 0.5 }}>→ {hash ? 'Transaction sent' : 'Sending...'}</div>
-                  <div style={{ marginBottom: '8px', opacity: confirming ? 1 : 0.5 }}>→ Confirming on Base...</div>
-                  <div style={{ opacity: 0.5 }}>→ Unlocking lead...</div>
-                </div>
-              </div>
-            )}
-            
-            {step === 'success' && (
-              <div style={{ textAlign: 'center', padding: '20px 0' }}>
-                <div style={{ fontSize: '40px', marginBottom: '16px' }}>◈</div>
-                <h3 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>Purchase Complete</h3>
-                {hash && (
-                  <p style={{ fontFamily: 'ui-monospace, monospace', fontSize: '11px', color: 'var(--muted)', marginBottom: '16px' }}>
-                    Tx: {hash.slice(0, 10)}...{hash.slice(-6)}
-                  </p>
                 )}
-                <div style={{ background: 'var(--dark3)', padding: '16px', marginBottom: '16px', textAlign: 'left' }}>
-                  <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: '10px', color: 'var(--muted)', marginBottom: '8px' }}>// LEAD DETAILS</div>
-                  <div>{selectedLead.title}</div>
-                  <div style={{ fontSize: '12px', color: 'var(--muted)', marginTop: '4px' }}>ID: {selectedLead.id}</div>
+              </div>
+
+              {/* Lead Contact Data */}
+              <div className="delivery-label">// UNLOCKED CONTACT DATA</div>
+              <div className="delivery-data">
+                {reveal.fields.map((f, i) => (
+                  <div className="delivery-field" key={i}>
+                    <span className="delivery-field-label">{f.label.toUpperCase()}</span>
+                    <span className="delivery-field-value">{f.value}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Actions */}
+              <div className="delivery-actions">
+                <button className="delivery-btn copy" onClick={copyLeadDetails}>
+                  {'\u2398'} Copy Lead Details
+                </button>
+                <button className="delivery-btn download" onClick={downloadLeadDetails}>
+                  {'\u2193'} Download as TXT
+                </button>
+              </div>
+              <button className="modal-cancel" style={{ width: '100%', marginTop: '12px' }} onClick={closeModal}>Close</button>
+            </div>
+          )}
+
+          {modalStep === 'success' && currentLead && !reveal && (
+            <div style={{ textAlign: 'center', padding: '40px 0' }}>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '13px', color: '#ff5050', marginBottom: '12px' }}>DELIVERY ERROR</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--muted)', marginBottom: '8px', lineHeight: 1.7 }}>
+                Payment confirmed, but lead data could not be loaded.<br />
+                Please retry retrieval or contact support.
+              </div>
+              {txHash && (
+                <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--muted)', marginBottom: '24px', wordBreak: 'break-all' }}>
+                  Tx: {txHash}
                 </div>
-                <button className="btn-primary" onClick={() => setSelectedLead(null)} style={{ width: '100%' }}>
-                  Close
-                </button>
-              </div>
-            )}
-            
-            {step === 'error' && (
-              <div style={{ textAlign: 'center', padding: '20px 0' }}>
-                <div style={{ color: '#ef4444', marginBottom: '16px' }}>FAILED</div>
-                <p style={{ fontSize: '13px', color: 'var(--muted)', marginBottom: '24px' }}>{errorMsg}</p>
-                <button className="btn-primary" onClick={() => setStep('select')}>
-                  Try Again
-                </button>
-              </div>
-            )}
-          </div>
+              )}
+              <button className="modal-confirm" onClick={closeModal}>Close</button>
+            </div>
+          )}
+
+          {modalStep === 'error' && (
+            <div style={{ textAlign: 'center', padding: '40px 0' }}>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '13px', color: '#ff5050', marginBottom: '16px' }}>PAYMENT FAILED</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--muted)', marginBottom: '24px' }}>{errorMsg}</div>
+              <button className="modal-confirm" onClick={closeModal}>Close</button>
+            </div>
+          )}
         </div>
-      )}
-    </div>
+      </div>
+
+      <Notification notifRef={notifRef} />
+    </>
   );
 }
