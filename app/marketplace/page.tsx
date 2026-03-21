@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useAccount, useWriteContract, useSendTransaction } from 'wagmi';
 import { parseUnits, parseEther } from 'viem';
 import { TOKENS, type TokenKey, ERC20_ABI, MARKETPLACE_WALLET } from '@/lib/contracts';
-import { fetchLiveLeads, HARDCODED_LEADS, revealData, type Lead, type LeadReveal } from '@/lib/leads';
+import { revealData, type Lead, type LeadReveal } from '@/lib/leads';
+import { useLeads } from '@/hooks/useLeads';
+import { timeAgo } from '@/lib/timeAgo';
 import { CustomCursor } from '@/components/CustomCursor';
 import { WalletConnect } from '@/components/WalletConnect';
 import { Notification, useNotification } from '@/components/Notification';
@@ -33,37 +35,14 @@ export default function Marketplace() {
   const { writeContractAsync } = useWriteContract();
   const { sendTransactionAsync } = useSendTransaction();
   const { ref: notifRef, show: showNotif } = useNotification();
+  const { leads, newLeadIds, clearNewFlag } = useLeads();
 
-  // State for leads - starts with hardcoded, loads live on mount
-  const [leads, setLeads] = useState<Lead[]>(HARDCODED_LEADS);
-  const [leadsLoading, setLeadsLoading] = useState(true);
-  const [leadsFromApi, setLeadsFromApi] = useState(false);
-  
   const [modalOpen, setModalOpen] = useState(false);
   const [currentLead, setCurrentLead] = useState<Lead | null>(null);
   const [selectedToken, setSelectedToken] = useState<TokenKey | 'ETH'>('USDC');
   const [modalStep, setModalStep] = useState<ModalStep>('select');
   const [errorMsg, setErrorMsg] = useState('');
   const [txHash, setTxHash] = useState('');
-
-  // Fetch live leads on page load
-  useEffect(() => {
-    const loadLeads = async () => {
-      setLeadsLoading(true);
-      const { leads: fetchedLeads, fromApi } = await fetchLiveLeads();
-      setLeads(fetchedLeads);
-      setLeadsFromApi(fromApi);
-      setLeadsLoading(false);
-      
-      if (fromApi) {
-        console.log(`Loaded ${fetchedLeads.length} leads from API`);
-      } else {
-        console.log('Using fallback leads');
-      }
-    };
-    
-    loadLeads();
-  }, []);
 
   const openModal = useCallback((leadId: string) => {
     const lead = leads.find((l) => l.id === leadId);
@@ -180,7 +159,7 @@ export default function Marketplace() {
         </p>
         <div className="stats-bar">
           <div className="stat">
-            <span className="stat-val">47</span>
+            <span className="stat-val">{leads.length}</span>
             <span className="stat-lbl">LEADS AVAILABLE</span>
           </div>
           <div className="stat">
@@ -201,11 +180,12 @@ export default function Marketplace() {
       {/* Filters */}
       <div className="filters">
         <Link href="/marketplace" className="filter-btn active">ALL</Link>
-        <Link href="/nft" className="filter-btn">NFT</Link>
-        <Link href="/defi" className="filter-btn">DEFI</Link>
-        <Link href="/token" className="filter-btn">TOKEN</Link>
-        <Link href="/misc" className="filter-btn">MISC</Link>
-        <Link href="/polymarket" className="filter-btn">POLYMARKET</Link>
+        <Link href="/marketplace/nft" className="filter-btn">NFT</Link>
+        <Link href="/marketplace/defi" className="filter-btn">DEFI</Link>
+        <Link href="/marketplace/token" className="filter-btn">TOKEN</Link>
+        <Link href="/marketplace/dao" className="filter-btn">DAO</Link>
+        <Link href="/marketplace/misc" className="filter-btn">MISC</Link>
+        <Link href="/marketplace/polymarket" className="filter-btn">POLYMARKET</Link>
         <Link href="/ebooks" className="filter-btn">EBOOKS {'\u2197'}</Link>
         <span className="filter-count">{leads.length} leads</span>
       </div>
@@ -213,7 +193,11 @@ export default function Marketplace() {
       {/* Leads Grid */}
       <div className="leads-grid">
         {leads.map((lead) => (
-          <div className="lead-card" key={lead.id}>
+          <div
+            className={`lead-card${newLeadIds.has(lead.id) ? ' new-lead' : ''}`}
+            key={lead.id}
+            onAnimationEnd={() => clearNewFlag(lead.id)}
+          >
             <div className={`tier-badge ${lead.tier}`}>{lead.tier.toUpperCase()}</div>
             <div className="lead-header">
               <span className="lead-category">{lead.category}</span>
@@ -230,7 +214,16 @@ export default function Marketplace() {
               <div className="meta-item"><div className="meta-dot" />{lead.wallet_age} wallet</div>
               <div className="meta-item"><div className="meta-dot" />{lead.liquidity} liquidity</div>
               <div className="meta-item"><div className="meta-dot" />{lead.contacts} contacts</div>
-              <div className="meta-item"><div className="meta-dot" />{lead.timestamp}</div>
+              <div className="meta-item"><div className="meta-dot" />{timeAgo(lead.timestamp)}</div>
+              {lead.win_rate && (
+                <div className="meta-item"><div className="meta-dot" />{lead.win_rate} win rate</div>
+              )}
+              {lead.volume && (
+                <div className="meta-item"><div className="meta-dot" />{lead.volume} volume</div>
+              )}
+              {lead.markets !== undefined && (
+                <div className="meta-item"><div className="meta-dot" />{lead.markets} markets</div>
+              )}
             </div>
             <div className="lead-footer">
               <div className="lead-price">

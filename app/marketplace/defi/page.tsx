@@ -3,7 +3,7 @@ import { CategoryPage } from '@/components/CategoryPage';
 export default function DefiPage() {
   return (
     <CategoryPage
-      slug="defi"
+      slug="marketplace/defi"
       category="DeFi Protocol"
       title='DeFi Leads. <span>Real Users, Real Capital.</span>'
       subtitle="High-intent DeFi users, protocols, and liquidity participants. Wallet-linked, verified, and ready to engage. Pay with USDC, unlock instantly."

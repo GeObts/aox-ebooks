@@ -5,12 +5,16 @@ export interface Lead {
   desc: string;
   score: number;
   price: number;
-  tier: 'standard' | 'premium' | 'enterprise';
+  tier: 'standard' | 'premium' | 'enterprise' | 'elite';
   wallet_age: string;
   liquidity: string;
   contacts: number;
   chain: string;
   timestamp: string;
+  // Polymarket-specific (optional)
+  win_rate?: string;
+  volume?: string;
+  markets?: number;
 }
 
 export interface RevealField {
@@ -25,6 +29,20 @@ export interface LeadReveal {
 
 // Fallback hardcoded leads if API fails
 export const HARDCODED_LEADS: Lead[] = [
+  {
+    id: 'vc-001',
+    category: 'Misc',
+    title: 'Web3 VC \u2014 Active Investors',
+    desc: 'Top 51 verified Web3 venture capital firms actively investing in DeFi, AI agents, and the onchain economy. Full contact info including emails, phone numbers, and pitch submission details.',
+    score: 95,
+    price: 1,
+    tier: 'elite',
+    wallet_age: 'Verified',
+    liquidity: '$Billions',
+    contacts: 51,
+    chain: 'Base',
+    timestamp: '2026-03-20T23:58:46.670025+00:00',
+  },
   {
     id: 'nft-4829',
     category: 'NFT Launch',
@@ -69,8 +87,8 @@ export const HARDCODED_LEADS: Lead[] = [
   },
   {
     id: 'dao-5571',
-    category: 'Misc',
-    title: 'DAO Treasury — $340K',
+    category: 'DAO',
+    title: 'DAO Treasury \u2014 $340K',
     desc: 'Active DAO with Gnosis Safe treasury. Snapshot governance, 234 members, weekly proposals.',
     score: 83,
     price: 30,
@@ -139,69 +157,64 @@ export const HARDCODED_LEADS: Lead[] = [
   },
 ];
 
-// Legacy export for backward compatibility
+// Export for backward compatibility and useLeads hook fallback
 export const leads = HARDCODED_LEADS;
 
-// API endpoint for live leads
-const API_ENDPOINT = 'http://3.142.118.148:3200/leads';
-
-// Map API lead to UI Lead format
-function mapApiLeadToLead(apiLead: any): Lead {
-  const tier = apiLead.tier?.toLowerCase() as 'standard' | 'premium' | 'enterprise' || 'standard';
-  const metadata = apiLead.metadata || {};
-  
-  // Calculate liquidity display from metadata
-  const liquidity = metadata.liquidity_usd 
-    ? `$${(metadata.liquidity_usd / 1000).toFixed(0)}K`
-    : '$10K';
-  
-  // Generate description from AI enrichment or fallback
-  const desc = apiLead.description || metadata.ai_description || `Verified ${apiLead.category} lead scored ${apiLead.score}/100 by AOX Research Agent.`;
-  
-  return {
-    id: apiLead.id,
-    category: apiLead.category,
-    title: apiLead.title,
-    desc: desc,
-    score: apiLead.score,
-    price: apiLead.price,
-    tier: tier,
-    wallet_age: metadata.wallet_age || '1 year',
-    liquidity: liquidity,
-    contacts: metadata.contact_method_count || 2,
-    chain: 'Base',
-    timestamp: 'Just listed',
-  };
-}
-
-// Fetch leads from API with fallback
-export async function fetchLiveLeads(): Promise<{ leads: Lead[]; fromApi: boolean }> {
-  try {
-    const response = await fetch(API_ENDPOINT, {
-      headers: { 'Accept': 'application/json' },
-    });
-    
-    if (!response.ok) {
-      throw new Error(`API returned ${response.status}`);
-    }
-    
-    const data = await response.json();
-    
-    if (data.listings && Array.isArray(data.listings) && data.listings.length > 0) {
-      const mappedLeads = data.listings.map(mapApiLeadToLead);
-      return { leads: mappedLeads, fromApi: true };
-    }
-    
-    console.log('No live leads available, using fallback');
-    return { leads: HARDCODED_LEADS, fromApi: false };
-    
-  } catch (error) {
-    console.error('Failed to fetch leads:', error);
-    return { leads: HARDCODED_LEADS, fromApi: false };
-  }
-}
-
 export const revealData: Record<string, LeadReveal> = {
+  'vc-001': {
+    name: 'Top 51 Web3 VCs \u2014 Full Contact Directory',
+    fields: [
+      { label: '#1 Andreessen Horowitz (a16z crypto)', value: 'crypto-jobs@a16z.com, menlopark-info@a16z.com' },
+      { label: '#2 Paradigm', value: 'info@paradigm.xyz' },
+      { label: '#3 Pantera Capital', value: 'pitch@panteracapital.com, +1 650 854 7000' },
+      { label: '#4 Blockchain Capital', value: 'contact@blockchaincapital.com, +1 (415) 677-5340' },
+      { label: '#5 Electric Capital', value: 'support@electriccapital.io, info@electriccapital.com ($1B+ AUM)' },
+      { label: '#6 Multicoin Capital', value: 'hello@multicoin.capital' },
+      { label: '#7 Framework Ventures', value: 'hello@framework.ventures, startups@framework.vc' },
+      { label: '#8 Jump Crypto', value: 'contact@jumpcrypto.com' },
+      { label: '#9 CoinFund', value: 'projects@coinfund.io' },
+      { label: '#10 Variant Fund', value: 'info@variant.fund' },
+      { label: '#11 Galaxy Digital', value: 'galaxy.com/contact, tmxeinvestorservices@tmx.com, 646-902-9205' },
+      { label: '#12 1kx', value: '1kx.network/contact (select Investment Pitch)' },
+      { label: '#13 Lightspeed Faction', value: 'legal@lsvp.com, 408-239-9940 ($285M blockchain fund)' },
+      { label: '#14 GSR Ventures', value: 'James@gsrventures.com, Allen@gsrventures.com (+86-10-5706-9898 Beijing, +852 3757 9478 HK)' },
+      { label: '#15 HashKey Capital', value: 'contact_capital@hashkey.com, (852) 3755 2388' },
+      { label: '#16 Animoca Brands', value: 'info@animocabrands.com, +852 2534 1222 (massive Web3 gaming portfolio)' },
+      { label: '#17 Digital Currency Group', value: '646-902-9205 (Grayscale, CoinDesk parent)' },
+      { label: '#18 Kenetic Capital', value: 'info@kenetic.capital (HK/Vancouver)' },
+      { label: '#19 Delphi Digital', value: 'legal@delphidigital.io, info@delphidigital.me' },
+      { label: '#20 CMS Holdings', value: 'support@cmsholdings.org' },
+      { label: '#21 QCP Capital', value: 'contact@qcp-capital.com, security@qcpgroup.com (Singapore)' },
+      { label: '#22 Amber Group', value: 'service@ambergroup.io' },
+      { label: '#23 LD Capital', value: 'bp@ldcap.com' },
+      { label: '#24 Hashed', value: 'contact@hashed.com (South Korea)' },
+      { label: '#25 Solana Ventures', value: 'solana-ventures.com/contact' },
+      { label: '#26 NEAR Foundation', value: 'info@nearfoundation.ngo, legal@near.foundation' },
+      { label: '#27 Polygon Ventures', value: 'privacy@polygon.technology' },
+      { label: '#28 OKX Ventures', value: 'ventures@okx.com, ventures@okxgroup.online' },
+      { label: '#29 KuCoin Ventures', value: 'KuCoin Help Center (no direct email)' },
+      { label: '#30 HTX Ventures', value: 'HTX Help Center (ex-Huobi)' },
+      { label: '#31 Coinbase Ventures', value: 'investor@coinbase.com (250+ portfolio)' },
+      { label: '#32 Binance Labs', value: 'support@binance.com (DeFi, gaming focus)' },
+      { label: '#33 Sequoia Capital', value: 'sequoiacap.com (Traditional VC giant in crypto)' },
+      { label: '#34 Dragonfly Capital', value: 'dragonfly.xyz (US/Asia cross-border)' },
+      { label: '#35 Haun Ventures', value: 'haunventures.com' },
+      { label: '#36 Draper Associates', value: 'draper.vc (early-stage)' },
+      { label: '#37 Mechanism Capital', value: 'mechanism.capital' },
+      { label: '#38 The Spartan Group', value: 'spartangroup.io' },
+      { label: '#39 DeFiance Capital', value: 'defiancecapital.com (DeFi, gaming, NFTs)' },
+      { label: '#40 Arrington Capital', value: 'arringtonxrpcapital.com' },
+      { label: '#41 Tribe Capital', value: 'tribecap.co (data-driven)' },
+      { label: '#42 South Park Commons', value: 'southparkcommons.com' },
+      { label: '#43 Foresight Ventures', value: 'foresightventures.com (US/Asia)' },
+      { label: '#44 AU21 Capital', value: 'au21.capital (170+ portfolio, seed-to-scale)' },
+      { label: '#45 Polychain Capital', value: 'info@polychain.capital' },
+      { label: '#46 Blockchain Capital', value: 'contact@blockchaincapital.com' },
+      { label: 'Investment Focus', value: 'web3, DeFi, AI agents' },
+      { label: 'Contact Types', value: 'Verified: Twitter + LinkedIn + Email + Phone + Pitch Forms' },
+      { label: 'Notes', value: 'Manually curated list of 51 active Web3 VCs. Includes direct emails, phone numbers, and pitch submission details. Updated March 2026.' },
+    ],
+  },
   'nft-4829': {
     name: 'PixelCraft Studios',
     fields: [

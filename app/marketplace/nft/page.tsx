@@ -3,7 +3,7 @@ import { CategoryPage } from '@/components/CategoryPage';
 export default function NftPage() {
   return (
     <CategoryPage
-      slug="nft"
+      slug="marketplace/nft"
       category="NFT Launch"
       title='NFT Leads. <span>Collectors and Creators, Verified.</span>'
       subtitle="Active NFT collectors, creators, and community builders on Base. Scored for engagement and delivered with full contact data."

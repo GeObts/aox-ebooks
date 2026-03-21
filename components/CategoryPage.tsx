@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { leads, type Lead } from '@/lib/leads';
+import { useLeads } from '@/hooks/useLeads';
+import { timeAgo } from '@/lib/timeAgo';
 import { CustomCursor } from '@/components/CustomCursor';
 import { WalletConnect } from '@/components/WalletConnect';
 
@@ -16,14 +17,16 @@ interface CategoryPageProps {
 
 const FILTER_TABS = [
   { href: '/marketplace', label: 'ALL' },
-  { href: '/nft', label: 'NFT' },
-  { href: '/defi', label: 'DEFI' },
-  { href: '/token', label: 'TOKEN' },
-  { href: '/misc', label: 'MISC' },
-  { href: '/polymarket', label: 'POLYMARKET' },
+  { href: '/marketplace/nft', label: 'NFT' },
+  { href: '/marketplace/defi', label: 'DEFI' },
+  { href: '/marketplace/token', label: 'TOKEN' },
+  { href: '/marketplace/dao', label: 'DAO' },
+  { href: '/marketplace/misc', label: 'MISC' },
+  { href: '/marketplace/polymarket', label: 'POLYMARKET' },
 ];
 
 export function CategoryPage({ slug, category, title, subtitle, trustLine1, trustLine2 }: CategoryPageProps) {
+  const { leads, newLeadIds, clearNewFlag } = useLeads();
   const filtered = leads.filter((l) => l.category === category);
 
   return (
@@ -88,7 +91,11 @@ export function CategoryPage({ slug, category, title, subtitle, trustLine1, trus
       {filtered.length > 0 ? (
         <div className="leads-grid">
           {filtered.map((lead) => (
-            <div className="lead-card" key={lead.id}>
+            <div
+              className={`lead-card${newLeadIds.has(lead.id) ? ' new-lead' : ''}`}
+              key={lead.id}
+              onAnimationEnd={() => clearNewFlag(lead.id)}
+            >
               <div className={`tier-badge ${lead.tier}`}>{lead.tier.toUpperCase()}</div>
               <div className="lead-header">
                 <span className="lead-category">{lead.category}</span>
@@ -105,7 +112,16 @@ export function CategoryPage({ slug, category, title, subtitle, trustLine1, trus
                 <div className="meta-item"><div className="meta-dot" />{lead.wallet_age} wallet</div>
                 <div className="meta-item"><div className="meta-dot" />{lead.liquidity} liquidity</div>
                 <div className="meta-item"><div className="meta-dot" />{lead.contacts} contacts</div>
-                <div className="meta-item"><div className="meta-dot" />{lead.timestamp}</div>
+                <div className="meta-item"><div className="meta-dot" />{timeAgo(lead.timestamp)}</div>
+                {lead.win_rate && (
+                  <div className="meta-item"><div className="meta-dot" />{lead.win_rate} win rate</div>
+                )}
+                {lead.volume && (
+                  <div className="meta-item"><div className="meta-dot" />{lead.volume} volume</div>
+                )}
+                {lead.markets !== undefined && (
+                  <div className="meta-item"><div className="meta-dot" />{lead.markets} markets</div>
+                )}
               </div>
               <div className="lead-footer">
                 <div className="lead-price">

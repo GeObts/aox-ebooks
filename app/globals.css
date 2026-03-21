@@ -1071,6 +1071,7 @@ nav {
 }
 .tier-badge.premium { border-color: var(--orange); color: var(--orange); }
 .tier-badge.enterprise { background: var(--orange); color: #080808; border-color: var(--orange); }
+.tier-badge.elite { background: linear-gradient(135deg, #F7931A, #FFD700); color: #080808; border-color: #FFD700; font-weight: 700; }
 
 /* ============================================
    MODAL
@@ -1742,4 +1743,15 @@ footer {
   .bundle-section { padding: 0 24px 48px; }
   .bundle-card { grid-template-columns: 1fr; gap: 32px; }
   footer { padding: 24px; }
+}
+
+/* ---- New Lead Flash Animation ---- */
+@keyframes orangeFlash {
+  0%   { box-shadow: 0 0 0 0 rgba(247,147,26,0.6); background: rgba(247,147,26,0.12); }
+  30%  { box-shadow: 0 0 20px 4px rgba(247,147,26,0.4); background: rgba(247,147,26,0.08); }
+  70%  { box-shadow: 0 0 10px 2px rgba(247,147,26,0.2); background: rgba(247,147,26,0.04); }
+  100% { box-shadow: 0 0 0 0 transparent; background: var(--dark2); }
+}
+.lead-card.new-lead {
+  animation: orangeFlash 1.5s ease-out;
 }

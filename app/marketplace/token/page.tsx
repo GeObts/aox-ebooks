@@ -3,7 +3,7 @@ import { CategoryPage } from '@/components/CategoryPage';
 export default function TokenPage() {
   return (
     <CategoryPage
-      slug="token"
+      slug="marketplace/token"
       category="Token Launch"
       title='Token Leads. <span>Early Attention, Identified.</span>'
       subtitle="Wallets and users interacting with new token launches on Base. Captured early, scored for quality, and delivered onchain after payment."

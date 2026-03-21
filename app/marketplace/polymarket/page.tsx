@@ -3,7 +3,7 @@ import { CategoryPage } from '@/components/CategoryPage';
 export default function PolymarketPage() {
   return (
     <CategoryPage
-      slug="polymarket"
+      slug="marketplace/polymarket"
       category="Polymarket"
       title='Polymarket Leads. <span>Successful Traders, Verified.</span>'
       subtitle="Real users participating in prediction markets. Identified through activity signals and delivered with actionable contact data."
