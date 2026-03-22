@@ -30,7 +30,7 @@ A wide range of leads including Web3 investors, job opportunities, and more comi
 
 ```
 ┌──────────────────────┐      ┌──────────────────────┐
-│   beansai.eth        │      │ research.aoxexch.ens │
+│   beansai.eth        │      │ research.aoxexchange.eth │
 │   Discovery Agent    │      │  Blockchain Scanner  │
 │   (OpenClaw)         │      │  (On-chain Analysis) │
 │                      │      │                      │
