@@ -1,85 +1,73 @@
-# AOX AgentTreasury
+# AOX — Agent Opportunity Exchange
 
-Multi-token treasury contract for AOX agents on Base mainnet.
-
-## Contract Details
-
-| Field | Value |
-|-------|-------|
-| **Contract** | AgentTreasury |
-| **Address** | `0xeB747c50eD3b327480228E18ffD4bd9Cf8646B47` |
-| **Network** | Base Mainnet (Chain ID: 8453) |
-| **Owner** | `0x6350B793688221c75cfB438547B9CA47f5b0D4f1` (Banker Wallet) |
-
-## Features
-
-- Multi-token support (wstETH, USDC, etc.)
-- Deposit/withdraw tracking per address
-- Owner-controlled emergency functions
-- Yield harvest hooks
-- Reentrancy protection
-
-## Supported Tokens
-
-| Token | Address | Status |
-|-------|---------|--------|
-| wstETH | `0xc1CBa3fCea344f92D9239c08C0568f6F2F0ee452` | ✅ Active |
-
-## Live Operation Proof (Test Transactions)
-
-### TEST 1: Lead Pipeline
-- Status: API operational at http://3.142.118.148:3200
-- Leads available: 2 active listings
-
-### TEST 2: Marketplace → Banker Sweep
-- **Tx Hash:** `0xfa233208d5e09c103c6604f01a6f22e98caaa5fba5cc548919f22d9cd691b9c2`
-- **Block:** 43625139
-- **BaseScan:** https://basescan.org/tx/0xfa233208d5e09c103c6604f01a6f22e98caaa5fba5cc548919f22d9cd691b9c2
-- **Details:** 0.001 ETH transferred from Marketplace to Banker
-
-### TEST 3: Banker Uniswap Swap (ETH → USDC)
-- **Tx Hash:** `0x74565187e3c458ba5452139172a0dc8c604ea8e88f78e34c2c3ed863c0e14807`
-- **Block:** 43625158
-- **BaseScan:** https://basescan.org/tx/0x74565187e3c458ba5452139172a0dc8c604ea8e88f78e34c2c3ed863c0e14807
-- **Details:** Swapped 0.001 ETH → 2.127908 USDC via Uniswap V3
-
-### TEST 4: Banker Uniswap Swap (ETH → wstETH)
-- **Tx Hash:** `0xbbef4e4eea9f98f70f056819b5fd1faeb989f78270765b7acc474298613f08b9`
-- **Block:** 43625465
-- **BaseScan:** https://basescan.org/tx/0xbbef4e4eea9f98f70f056819b5fd1faeb989f78270765b7acc474298613f08b9
-- **Details:** Swapped 0.001 ETH → 0.000813 wstETH (yield-bearing)
-
-### TEST 5: AgentTreasury Deployment
-- **Tx Hash:** `0x1a816d6f5aef3f6efc304bc6503bd2147ffbbace2b4b8ad90dd96d6ef1e8a517`
-- **Block:** 43625617
-- **BaseScan:** https://basescan.org/tx/0x1a816d6f5aef3f6efc304bc6503bd2147ffbbace2b4b8ad90dd96d6ef1e8a517
-
-### TEST 6: wstETH Deposit to Treasury
-- **Tx Hash:** `0xf1cf1fd34432da7043c640db4370ba42588432027100b77118ed3ceb357e907e`
-- **Block:** 43626039
-- **BaseScan:** https://basescan.org/tx/0xf1cf1fd34432da7043c640db4370ba42588432027100b77118ed3ceb357e907e
-- **Details:** Deposited 0.000813 wstETH into AgentTreasury
-
-## Current Treasury Holdings
-
-| Asset | Amount | Location |
-|-------|--------|----------|
-| wstETH | 0.000813 | AgentTreasury contract |
-| USDC | 2.127908 | Banker wallet |
-| ETH | ~0.012 | Banker wallet (gas) |
+> Autonomous multi-agent Web3 lead discovery, scoring, and marketplace system.
 
 ## Architecture
 
 ```
-Marketplace Agent → Banker Wallet → AgentTreasury
-     (sweep)            (swap)        (yield)
+┌─────────────────────────────────────────────────────────────┐
+│                        AOX PLATFORM                         │
+├─────────────────────────────────────────────────────────────┤
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │   Research   │  │   Scoring    │  │  Marketplace │      │
+│  │    Agent     │──│    Agent     │──│    Agent     │      │
+│  └──────────────┘  └──────────────┘  └──────────────┘      │
+│         │                   │                   │            │
+│         └───────────────────┴───────────────────┘            │
+│                             │                               │
+│                    ┌────────┴────────┐                       │
+│                    │   AOX CEO       │                       │
+│                    │  (Orchestrator) │                       │
+│                    └─────────────────┘                       │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-## Verification
+## Packages
 
-View contract on BaseScan:
-https://basescan.org/address/0xeB747c50eD3b327480228E18ffD4bd9Cf8646B47
+| Package | Path | Description |
+|---------|------|-------------|
+| **aox-ebooks** | `packages/aox-ebooks/` | Next.js frontend + x402 payment API |
+| **aox-treasury** | `packages/aox-treasury/` | Smart contracts (AgentTreasury, etc.) |
+| **lido-mcp** | `packages/lido-mcp/` | Lido MCP server for yield optimization |
+| **polymarket-cli** | `packages/polymarket-cli/` | Polymarket data CLI tool |
+| **aox-landing** | `packages/aox-landing/` | Marketing landing page |
 
-## License
+## Quick Start
 
-MIT
+```bash
+# Install dependencies
+npm install
+
+# Run frontend
+cd packages/aox-ebooks && npm run dev
+
+# Run marketplace API
+node packages/aox-ebooks/api_server.js
+
+# Run x402 payment server
+node packages/aox-ebooks/x402-server.js
+```
+
+## Hackathon Tracks
+
+- ✅ **Base** — Deployed on Base mainnet
+- ✅ **ENS** — Multiple ENS registrations (ceo.aoxexchange.eth, marketplace.aoxexchange.eth, etc.)
+- ✅ **ERC-8004** — 2 agents registered
+- ✅ **Venice AI** — Private inference for scoring
+
+## Key Contracts
+
+| Contract | Address | ENS |
+|----------|---------|-----|
+| AgentTreasury | `0xeB747c50eD3b327480228E18ffD4bd9Cf8646B47` | lidotreasure.aoxexchange.eth |
+| BNKR Token | `0x22af33fe49fd1fa80c7149773dde5890d3c76f3b` | — |
+
+## Team
+
+- **Goyabean** — Founder/Operator
+- **AOX** — CEO Agent (autonomous orchestrator)
+- **beansai** — Research Agent (Polymarket specialist)
+
+---
+
+Built for **The Synthesis — Ethereum Agent Hackathon 2026**

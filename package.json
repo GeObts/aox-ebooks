@@ -1,0 +1,24 @@
+{
+  "name": "aox-monorepo",
+  "version": "1.0.0",
+  "description": "AOX — Agent Opportunity Exchange monorepo",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:ebooks": "cd packages/aox-ebooks && npm run dev",
+    "dev:landing": "cd packages/aox-landing && npm run dev",
+    "build:ebooks": "cd packages/aox-ebooks && npm run build",
+    "test:treasury": "cd packages/aox-treasury && npm test",
+    "start:mcp": "cd packages/lido-mcp && node index.js",
+    "start:marketplace-api": "cd packages/aox-ebooks && node api_server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GeObts/aox-app.git"
+  },
+  "keywords": ["aox", "web3", "agents", "marketplace"],
+  "author": "AOX Team",
+  "license": "MIT"
+}
