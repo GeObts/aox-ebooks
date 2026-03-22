@@ -45,6 +45,7 @@ export default function Marketplace() {
   const [modalStep, setModalStep] = useState<ModalStep>('select');
   const [errorMsg, setErrorMsg] = useState('');
   const [txHash, setTxHash] = useState('');
+  const [fetchedReveal, setFetchedReveal] = useState<Record<string, LeadReveal>>({});
 
   const openModal = useCallback((leadId: string) => {
     const lead = leads.find((l) => l.id === leadId);
@@ -104,6 +105,20 @@ export default function Marketplace() {
       }
 
       setTxHash(hash);
+
+      // If no local revealData, try fetching from the API
+      if (currentLead && !revealData[currentLead.id]) {
+        try {
+          const apiRes = await fetch(`/api/leads/contacts?id=${currentLead.id}`);
+          if (apiRes.ok) {
+            const data = await apiRes.json();
+            if (data && data.fields) {
+              setFetchedReveal((prev) => ({ ...prev, [currentLead.id]: data }));
+            }
+          }
+        } catch { /* fall through to PAYMENT CONFIRMED fallback */ }
+      }
+
       await new Promise((r) => setTimeout(r, 800));
       setModalStep('success');
       showNotif('// lead purchased \u2014 content unlocked');
@@ -118,7 +133,7 @@ export default function Marketplace() {
     }
   }, [currentLead, isConnected, chain, selectedToken, writeContractAsync, sendTransactionAsync, switchChainAsync, showNotif]);
 
-  const reveal: LeadReveal | null = currentLead ? revealData[currentLead.id] || null : null;
+  const reveal: LeadReveal | null = currentLead ? revealData[currentLead.id] || fetchedReveal[currentLead.id] || null : null;
 
   const copyLeadDetails = useCallback(() => {
     if (!currentLead || !reveal) return;
