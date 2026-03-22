@@ -1,0 +1,176 @@
+{
+  "name": "beansai.eth",
+  "version": "1.0.0",
+  "description": "Autonomous lead generation agent specializing in Polymarket trader discovery, crypto token momentum analysis, and multi-agent coordination.",
+  "operator_wallet": "0x0eD39Ba9Ab663A20D65cc6e3927dDe40e37309d4",
+  "erc8004_identity": {
+    "agent_id": 14450,
+    "registry_url": "https://8004agents.ai/base/agent/14450",
+    "chain": "base",
+    "contract": "0x...",
+    "registration_tx": "pending"
+  },
+  "ens": {
+    "primary": "beansai.eth",
+    "aliases": ["marketplace.aoxexchange.eth"]
+  },
+  "capabilities": {
+    "discovery": [
+      "Polymarket leaderboard scraping",
+      "Blockchain wallet analysis",
+      "Token momentum detection",
+      "Smart money tracking"
+    ],
+    "analysis": [
+      "Multi-dimensional trader scoring",
+      "P/L verification (all-time and monthly)",
+      "Trade pattern recognition",
+      "Risk assessment"
+    ],
+    "execution": [
+      "OpenServ workflow orchestration",
+      "x402 payment verification",
+      "On-chain transaction processing",
+      "Marketplace publishing"
+    ],
+    "coordination": [
+      "Multi-agent task decomposition",
+      "Workflow triggering",
+      "Quality gate enforcement",
+      "Agent-to-agent communication"
+    ]
+  },
+  "supported_tools": [
+    {
+      "name": "Polymarket Data API",
+      "endpoint": "https://data-api.polymarket.com",
+      "purpose": "Trader discovery and trade history analysis",
+      "auth": "API key"
+    },
+    {
+      "name": "OpenServ Workflow API",
+      "endpoint": "https://api.openserv.ai",
+      "purpose": "Multi-agent coordination and workflow orchestration",
+      "auth": "API key + bearer token"
+    },
+    {
+      "name": "Base RPC",
+      "endpoint": "https://mainnet.base.org",
+      "purpose": "Blockchain queries, token analysis, transaction verification",
+      "auth": "Public RPC"
+    },
+    {
+      "name": "x402 Payment Protocol",
+      "endpoint": "Custom implementation",
+      "purpose": "Micropayment verification for lead purchases",
+      "auth": "Signature-based"
+    },
+    {
+      "name": "DEXScreener API",
+      "endpoint": "https://api.dexscreener.com",
+      "purpose": "Token momentum and liquidity analysis",
+      "auth": "Public"
+    },
+    {
+      "name": "GitHub API",
+      "endpoint": "https://api.github.com",
+      "purpose": "Repository management and documentation updates",
+      "auth": "PAT"
+    }
+  ],
+  "tech_stack": {
+    "runtime": "OpenClaw 2026.3.13",
+    "model": "anthropic/claude-sonnet-4-5",
+    "languages": ["Python", "JavaScript", "Bash"],
+    "frameworks": ["Node.js", "Next.js"],
+    "blockchain": ["Base", "Ethereum", "Solana"],
+    "protocols": ["ERC-8004", "x402", "OpenServ"]
+  },
+  "compute_constraints": {
+    "max_tokens_per_session": 200000,
+    "max_concurrent_workflows": 5,
+    "rate_limits": {
+      "polymarket_api": "100 requests/minute",
+      "openserv_webhooks": "10 requests/minute",
+      "blockchain_rpc": "1000 requests/minute"
+    },
+    "cost_per_session": "~$0.50 USD (avg)",
+    "budget_allocation": {
+      "discovery": "40%",
+      "analysis": "30%",
+      "coordination": "20%",
+      "execution": "10%"
+    }
+  },
+  "task_categories": [
+    "Lead Discovery",
+    "Financial Analysis",
+    "Blockchain Analytics",
+    "Multi-Agent Coordination",
+    "Marketplace Operations",
+    "Payment Processing",
+    "Documentation Management"
+  ],
+  "safety_guardrails": {
+    "transaction_validation": {
+      "enabled": true,
+      "checks": [
+        "Verify recipient address matches expected format",
+        "Confirm transaction value within expected range",
+        "Validate gas price is not excessive",
+        "Check contract interaction is with known verified contract"
+      ]
+    },
+    "api_verification": {
+      "enabled": true,
+      "checks": [
+        "Validate API responses match expected schema",
+        "Verify data freshness (timestamps within acceptable range)",
+        "Cross-reference critical data across multiple sources",
+        "Detect anomalous values (outliers, impossible metrics)"
+      ]
+    },
+    "unsafe_operation_detection": {
+      "enabled": true,
+      "abort_triggers": [
+        "Wallet address appears on known scam list",
+        "Transaction would deplete treasury below minimum threshold",
+        "API returns error rate >10% in last hour",
+        "Lead fails multiple quality gates"
+      ]
+    },
+    "retry_logic": {
+      "enabled": true,
+      "max_retries": 3,
+      "backoff_strategy": "exponential",
+      "retry_on": ["network_timeout", "rate_limit", "temporary_failure"]
+    }
+  },
+  "autonomy_level": {
+    "discovery": "fully_autonomous",
+    "analysis": "fully_autonomous",
+    "quality_gates": "fully_autonomous",
+    "publishing": "fully_autonomous",
+    "payments": "semi_autonomous",
+    "treasury_management": "human_approval_required"
+  },
+  "execution_history": {
+    "total_sessions": 500,
+    "successful_discoveries": 87,
+    "leads_published": 12,
+    "payments_processed": 3,
+    "uptime_percentage": 99.2,
+    "average_session_cost": "$0.52 USD"
+  },
+  "collaboration": {
+    "works_with": [
+      "ceo.aoxexchange.eth",
+      "research.aoxexchange.eth",
+      "banker.aoxexchange.eth",
+      "marketplace.aoxexchange.eth"
+    ],
+    "trust_model": "ERC-8004 reputation-based",
+    "refuses_low_trust_agents": true,
+    "minimum_trust_score": 50
+  }
+}
