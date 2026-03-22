@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -8,115 +8,291 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 /**
  * @title AgentTreasury
- * @notice Treasury contract for AOX agents to hold yield-bearing assets
- * @dev Designed for wstETH and other yield tokens on Base
+ * @notice A treasury primitive where humans deposit wstETH principal,
+ *         yield accrues, and AI agents can spend ONLY the yield — never the principal.
+ * @author AOX (Agent Opportunity Exchange)
+ * @dev Built for The Synthesis Ethereum Agent Hackathon 2026
  */
 contract AgentTreasury is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
-    // Events
-    event Deposit(address indexed token, address indexed depositor, uint256 amount);
-    event Withdrawal(address indexed token, address indexed recipient, uint256 amount);
-    event YieldHarvested(address indexed token, uint256 amount);
-
-    // Supported tokens (wstETH, USDC, etc.)
-    mapping(address => bool) public supportedTokens;
+    // ============ State Variables ============
     
-    // Token balances per depositor
-    mapping(address => mapping(address => uint256)) public balances;
+    /// @notice The wstETH token contract
+    IERC20 public immutable wstETH;
     
-    // Total token holdings
-    mapping(address => uint256) public totalDeposits;
-
-    // Constructor
-    constructor(address _owner) Ownable(_owner) {
-        // Owner is the deployer (Banker agent)
+    /// @notice The agent wallet authorized to withdraw yield
+    address public agentWallet;
+    
+    /// @notice The principal amount deposited by owner (in wstETH)
+    uint256 public principal;
+    
+    /// @notice The spending cap per transaction (in wstETH, roughly equivalent to 10 USDC)
+    uint256 public spendingCap;
+    
+    /// @notice Default spending cap: ~10 USDC worth (using 0.005 wstETH as proxy)
+    uint256 public constant DEFAULT_SPENDING_CAP = 0.005 ether;
+    
+    /// @notice Precision for yield calculations
+    uint256 public constant PRECISION = 1e18;
+    
+    // ============ Events ============
+    
+    event Deposit(
+        address indexed depositor,
+        uint256 amount,
+        uint256 newPrincipal,
+        uint256 timestamp
+    );
+    
+    event YieldWithdrawn(
+        address indexed agent,
+        uint256 amount,
+        uint256 remainingYield,
+        uint256 timestamp
+    );
+    
+    event PrincipalWithdrawn(
+        address indexed owner,
+        uint256 amount,
+        uint256 timestamp
+    );
+    
+    event SpendingCapUpdated(
+        uint256 oldCap,
+        uint256 newCap,
+        uint256 timestamp
+    );
+    
+    event AgentWalletUpdated(
+        address oldAgent,
+        address newAgent,
+        uint256 timestamp
+    );
+    
+    // ============ Modifiers ============
+    
+    modifier onlyAgent() {
+        require(msg.sender == agentWallet, "AgentTreasury: caller is not the agent");
+        _;
     }
-
+    
+    // ============ Constructor ============
+    
     /**
-     * @notice Add supported token
-     * @param token Token address to support
+     * @notice Deploy the treasury
+     * @param _wstETH The wstETH token address on Base (0xc1CBa3fCea344f92D9239c08C0568f6F2F0ee452)
+     * @param _agentWallet The AI agent wallet authorized to spend yield
+     * @param _owner The human owner who deposits principal (AOX CEO wallet)
      */
-    function addSupportedToken(address token) external onlyOwner {
-        supportedTokens[token] = true;
+    constructor(
+        address _wstETH,
+        address _agentWallet,
+        address _owner
+    ) Ownable(_owner) {
+        require(_wstETH != address(0), "AgentTreasury: wstETH address cannot be zero");
+        require(_agentWallet != address(0), "AgentTreasury: agent wallet cannot be zero");
+        
+        wstETH = IERC20(_wstETH);
+        agentWallet = _agentWallet;
+        spendingCap = DEFAULT_SPENDING_CAP;
+        
+        emit AgentWalletUpdated(address(0), _agentWallet, block.timestamp);
     }
-
+    
+    // ============ Deposit Functions ============
+    
     /**
-     * @notice Remove supported token
-     * @param token Token address to remove
+     * @notice Deposit wstETH as principal (only owner)
+     * @param amount The amount of wstETH to deposit
      */
-    function removeSupportedToken(address token) external onlyOwner {
-        supportedTokens[token] = false;
+    function deposit(uint256 amount) external onlyOwner nonReentrant {
+        require(amount > 0, "AgentTreasury: amount must be greater than 0");
+        
+        // Transfer wstETH from owner to this contract
+        wstETH.safeTransferFrom(msg.sender, address(this), amount);
+        
+        // Increase principal tracking
+        principal += amount;
+        
+        emit Deposit(msg.sender, amount, principal, block.timestamp);
     }
-
+    
     /**
-     * @notice Deposit tokens into treasury
-     * @param token Token to deposit
-     * @param amount Amount to deposit
+     * @notice Deposit wstETH with permit (gasless approval)
+     * @param amount The amount of wstETH to deposit
+     * @param deadline The permit deadline
+     * @param v The permit signature v
+     * @param r The permit signature r
+     * @param s The permit signature s
      */
-    function deposit(address token, uint256 amount) external nonReentrant {
-        require(supportedTokens[token], "Token not supported");
-        require(amount > 0, "Amount must be > 0");
+    function depositWithPermit(
+        uint256 amount,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external onlyOwner nonReentrant {
+        require(amount > 0, "AgentTreasury: amount must be greater than 0");
         
-        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
-        balances[token][msg.sender] += amount;
-        totalDeposits[token] += amount;
-        
-        emit Deposit(token, msg.sender, amount);
-    }
-
-    /**
-     * @notice Withdraw tokens from treasury
-     * @param token Token to withdraw
-     * @param amount Amount to withdraw
-     */
-    function withdraw(address token, uint256 amount) external nonReentrant {
-        require(balances[token][msg.sender] >= amount, "Insufficient balance");
-        
-        balances[token][msg.sender] -= amount;
-        totalDeposits[token] -= amount;
-        
-        IERC20(token).safeTransfer(msg.sender, amount);
-        
-        emit Withdrawal(token, msg.sender, amount);
-    }
-
-    /**
-     * @notice Harvest yield - anyone can call to trigger yield accounting
-     * @param token Token to check yield for
-     */
-    function harvestYield(address token) external {
-        // For yield-bearing tokens like wstETH, the balance naturally grows
-        // This function can be extended to distribute rewards or rebalance
-        uint256 currentBalance = IERC20(token).balanceOf(address(this));
-        uint256 yield = currentBalance > totalDeposits[token] ? currentBalance - totalDeposits[token] : 0;
-        
-        if (yield > 0) {
-            emit YieldHarvested(token, yield);
+        // Use permit for gasless approval
+        try IERC20Permit(address(wstETH)).permit(
+            msg.sender,
+            address(this),
+            amount,
+            deadline,
+            v,
+            r,
+            s
+        ) {} catch {
+            // Permit may fail if already approved, continue anyway
         }
+        
+        // Transfer wstETH from owner to this contract
+        wstETH.safeTransferFrom(msg.sender, address(this), amount);
+        
+        // Increase principal tracking
+        principal += amount;
+        
+        emit Deposit(msg.sender, amount, principal, block.timestamp);
     }
-
+    
+    // ============ Agent Yield Spending ============
+    
     /**
-     * @notice Emergency withdrawal by owner
-     * @param token Token to withdraw
-     * @param recipient Recipient address
-     * @param amount Amount to withdraw
+     * @notice Withdraw accrued yield (only agent, only yield, never principal)
+     * @param amount The amount of yield to withdraw
      */
-    function emergencyWithdraw(address token, address recipient, uint256 amount) external onlyOwner {
-        IERC20(token).safeTransfer(recipient, amount);
+    function withdrawYield(uint256 amount) external onlyAgent nonReentrant {
+        require(amount > 0, "AgentTreasury: amount must be greater than 0");
+        require(amount <= spendingCap, "AgentTreasury: amount exceeds spending cap");
+        
+        uint256 availableYield = getAvailableYield();
+        require(amount <= availableYield, "AgentTreasury: insufficient yield");
+        
+        // Transfer yield to agent
+        wstETH.safeTransfer(agentWallet, amount);
+        
+        emit YieldWithdrawn(msg.sender, amount, availableYield - amount, block.timestamp);
     }
-
+    
+    // ============ Owner Principal Withdrawal ============
+    
     /**
-     * @notice Get balance of token for depositor
+     * @notice Withdraw principal (only owner)
+     * @param amount The amount of principal to withdraw
      */
-    function getBalance(address token, address depositor) external view returns (uint256) {
-        return balances[token][depositor];
+    function withdrawPrincipal(uint256 amount) external onlyOwner nonReentrant {
+        require(amount > 0, "AgentTreasury: amount must be greater than 0");
+        require(amount <= principal, "AgentTreasury: insufficient principal");
+        
+        // Decrease principal tracking
+        principal -= amount;
+        
+        // Transfer principal to owner
+        wstETH.safeTransfer(owner(), amount);
+        
+        emit PrincipalWithdrawn(msg.sender, amount, block.timestamp);
     }
-
+    
     /**
-     * @notice Check if token is supported
+     * @notice Withdraw all principal (only owner)
      */
-    function isSupported(address token) external view returns (bool) {
-        return supportedTokens[token];
+    function withdrawAllPrincipal() external onlyOwner nonReentrant {
+        require(principal > 0, "AgentTreasury: no principal to withdraw");
+        
+        uint256 amount = principal;
+        principal = 0;
+        
+        wstETH.safeTransfer(owner(), amount);
+        
+        emit PrincipalWithdrawn(msg.sender, amount, block.timestamp);
     }
+    
+    // ============ View Functions ============
+    
+    /**
+     * @notice Get the total wstETH balance of this contract
+     * @return The total wstETH balance
+     */
+    function getTotalBalance() external view returns (uint256) {
+        return wstETH.balanceOf(address(this));
+    }
+    
+    /**
+     * @notice Get the available yield (total balance minus principal)
+     * @return The available yield
+     */
+    function getAvailableYield() public view returns (uint256) {
+        uint256 totalBalance = wstETH.balanceOf(address(this));
+        if (totalBalance <= principal) {
+            return 0;
+        }
+        return totalBalance - principal;
+    }
+    
+    /**
+     * @notice Get the locked principal amount
+     * @return The principal amount
+     */
+    function getPrincipal() external view returns (uint256) {
+        return principal;
+    }
+    
+    // ============ Admin Functions ============
+    
+    /**
+     * @notice Update the spending cap (only owner)
+     * @param newCap The new spending cap
+     */
+    function setSpendingCap(uint256 newCap) external onlyOwner {
+        require(newCap > 0, "AgentTreasury: cap must be greater than 0");
+        
+        uint256 oldCap = spendingCap;
+        spendingCap = newCap;
+        
+        emit SpendingCapUpdated(oldCap, newCap, block.timestamp);
+    }
+    
+    /**
+     * @notice Update the agent wallet (only owner)
+     * @param newAgentWallet The new agent wallet address
+     */
+    function setAgentWallet(address newAgentWallet) external onlyOwner {
+        require(newAgentWallet != address(0), "AgentTreasury: agent wallet cannot be zero");
+        
+        address oldAgent = agentWallet;
+        agentWallet = newAgentWallet;
+        
+        emit AgentWalletUpdated(oldAgent, newAgentWallet, block.timestamp);
+    }
+    
+    /**
+     * @notice Emergency rescue tokens (only owner, for non-wstETH tokens)
+     * @param token The token to rescue
+     * @param amount The amount to rescue
+     */
+    function rescueTokens(address token, uint256 amount) external onlyOwner {
+        require(token != address(wstETH), "AgentTreasury: cannot rescue wstETH");
+        IERC20(token).safeTransfer(owner(), amount);
+    }
+    
+    // ============ Receive Function ============
+    
+    receive() external payable {
+        revert("AgentTreasury: do not send ETH directly");
+    }
+}
+
+// Minimal interface for permit functionality
+interface IERC20Permit {
+    function permit(
+        address owner,
+        address spender,
+        uint256 value,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external;
 }
