@@ -107,6 +107,7 @@ export function CategoryPage({ slug, category, title, subtitle, trustLine1, trus
         const ethPrice = 2000;
         const value = parseEther((currentLead.price / ethPrice).toFixed(6));
         hash = await sendTransactionAsync({
+          chainId: base.id,
           to: MARKETPLACE_WALLET as `0x${string}`,
           value,
         });
@@ -114,6 +115,7 @@ export function CategoryPage({ slug, category, title, subtitle, trustLine1, trus
         const token = TOKENS[selectedToken];
         const amount = parseUnits(currentLead.price.toString(), token.decimals);
         hash = await writeContractAsync({
+          chainId: base.id,
           address: token.address as `0x${string}`,
           abi: ERC20_ABI,
           functionName: 'transfer',
@@ -125,8 +127,11 @@ export function CategoryPage({ slug, category, title, subtitle, trustLine1, trus
       setModalStep('success');
       showNotif('// lead purchased \u2014 content unlocked');
     } catch (e: any) {
-      const msg = e?.message?.includes('Insufficient') ? '// insufficient balance' : '// transaction rejected';
-      setErrorMsg(e?.message || 'Transaction failed');
+      const raw = e?.shortMessage || e?.message || 'Transaction failed';
+      const isRejected = raw.toLowerCase().includes('rejected') || raw.toLowerCase().includes('denied');
+      const isInsufficient = raw.toLowerCase().includes('insufficient');
+      const msg = isRejected ? '// transaction cancelled' : isInsufficient ? '// insufficient balance' : '// transaction failed';
+      setErrorMsg(isRejected ? 'You rejected the transaction in your wallet. Click the pay button to try again.' : isInsufficient ? 'Insufficient token balance for this purchase.' : raw);
       setModalStep('error');
       showNotif(msg, true);
     }
