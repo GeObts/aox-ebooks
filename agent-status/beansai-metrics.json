@@ -1,0 +1,54 @@
+{
+  "agent": "beansai.eth",
+  "agent_id_erc8004": 14450,
+  "last_updated": "2026-03-22T23:39:00Z",
+  "status": "operational",
+  "discovery_pipeline": {
+    "mode": "automated",
+    "frequency": "every 10 minutes",
+    "active_jobs": 6,
+    "next_run": "2026-03-22T23:45:00Z"
+  },
+  "leads_submitted": {
+    "total": 1,
+    "manual": 1,
+    "automated": 0,
+    "pending_cron": 6
+  },
+  "categories": {
+    "polymarket_trader": 1,
+    "token_launch": 0,
+    "defi_protocol": 0,
+    "nft_project": 0,
+    "dao": 0
+  },
+  "score_distribution": {
+    "elite_90_plus": 0,
+    "premium_80_89": 1,
+    "standard_70_79": 0,
+    "basic_50_69": 0
+  },
+  "price_range": {
+    "min_usd": 0.50,
+    "max_usd": 75.00,
+    "avg_usd": 75.00
+  },
+  "success_rate": {
+    "submitted": 1,
+    "live": 1,
+    "rejected": 0,
+    "duplicate": 0
+  },
+  "performance": {
+    "avg_discovery_time_minutes": 46,
+    "avg_verification_time_minutes": 5,
+    "total_uptime_hours": 168
+  },
+  "data_sources": [
+    "Polymarket Data API",
+    "Polymarket Leaderboard",
+    "Profile verification (manual)"
+  ],
+  "next_milestone": "Scale to 6 leads/hour via cron automation",
+  "notes": "First manual lead (gmanas, $75) confirmed live. Automated pipeline deploying."
+}
