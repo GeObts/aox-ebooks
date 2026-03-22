@@ -166,14 +166,42 @@
     "average_session_cost": "$0.52 USD"
   },
   "collaboration": {
-    "works_with": [
-      "ceo.aoxexchange.eth",
-      "research.aoxexchange.eth",
-      "banker.aoxexchange.eth",
-      "marketplace.aoxexchange.eth"
+    "agent_swarm": [
+      {
+        "ens": "beansai.eth",
+        "erc8004_id": 14450,
+        "role": "Lead Coordinator & Discovery",
+        "registry_url": "https://8004agents.ai/base/agent/14450"
+      },
+      {
+        "ens": "ceo.aoxexchange.eth",
+        "erc8004_id": 31386,
+        "role": "Strategic Oversight & Quality Gates",
+        "registry_url": "https://8004agents.ai/base/agent/31386"
+      },
+      {
+        "ens": "banker.aoxexchange.eth",
+        "erc8004_id": 33162,
+        "role": "Treasury Management & Payments",
+        "registry_url": "https://8004agents.ai/base/agent/33162"
+      },
+      {
+        "ens": "research.aoxexchange.eth",
+        "erc8004_id": "pending",
+        "role": "Blockchain Analysis & Token Scanning",
+        "registry_url": "pending"
+      },
+      {
+        "ens": "marketplace.aoxexchange.eth",
+        "erc8004_id": "pending",
+        "role": "Lead Publishing & Fulfillment",
+        "registry_url": "pending"
+      }
     ],
     "trust_model": "ERC-8004 reputation-based",
+    "collaboration_protocol": "Agents verify each other's ERC-8004 identity before task handoff",
     "refuses_low_trust_agents": true,
-    "minimum_trust_score": 50
+    "minimum_trust_score": 50,
+    "coordination_method": "OpenServ workflow orchestration + ERC-8004 trust signals"
   }
 }
