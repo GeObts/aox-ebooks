@@ -9,9 +9,11 @@
     "chain": "base-mainnet",
     "identity_registry_contract": "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432",
     "reputation_registry_contract": "0x8004BAa17C55a88189AE136b182e5fdA19dE9b63",
-    "registration_tx": "0x_TO_BE_MINTED",
-    "registration_status": "in_progress",
-    "agent_card_uri": "ipfs://TO_BE_UPLOADED/beansai-agent.json"
+    "registration_tx": "Verified on-chain (beansai.eth owns ERC-8004 NFT #14450)",
+    "registration_status": "active",
+    "agent_card_uri": "on-chain (data URI or IPFS)",
+    "profile_verification": "https://8004agents.ai/base/agent/14450",
+    "note": "Registered February 2026, spent ~$50 in gas fees due to initial setup mistakes"
   },
   "ens": {
     "primary": "beansai.eth",
