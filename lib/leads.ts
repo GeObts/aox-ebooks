@@ -42,25 +42,6 @@ export const HARDCODED_LEADS: Lead[] = [
     chain: 'Base',
     timestamp: '2026-03-21T23:58:00.000Z',
   },
-
-  {
-    id: 'poly-1003',
-    category: 'Polymarket',
-    title: 'Polymarket Whale — $64M Volume',
-    desc: 'Verified high-volume prediction market trader. 500 trades across 56 unique markets. Enterprise-grade intelligence with full wallet and profile data.',
-    score: 90,
-    price: 100,
-    tier: 'enterprise',
-    wallet_age: 'Verified',
-    liquidity: '$64.2M',
-    contacts: 1,
-    chain: 'Polygon',
-    timestamp: '2026-03-21T05:00:00.000Z',
-    win_rate: 'Unverified',
-    volume: '$64.2M',
-    markets: 56,
-  },
-
   {
     id: 'nft-4829',
     category: 'NFT Launch',
