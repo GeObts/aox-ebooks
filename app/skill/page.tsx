@@ -29,7 +29,11 @@ export default function SkillPage() {
         <p>All transactions settle on-chain. Every action is logged and verifiable.</p>
 
         <h2>x402 Endpoint</h2>
-        <p><strong>Base URL:</strong> <code>http://100.65.229.34:3200</code></p>
+        <p><strong>Base URL:</strong> <code>http://3.142.118.148:3200</code></p>
+
+        <h3>Browse Available Leads</h3>
+        <pre><code>GET /leads</code></pre>
+        <p><strong>Response:</strong> JSON array of all available leads with pricing, scores, and metadata.</p>
 
         <h3>Get Lead (with x402 payment)</h3>
         <pre><code>GET /lead?id={'{lead_id}'}</code></pre>
@@ -60,9 +64,11 @@ export default function SkillPage() {
           </thead>
           <tbody>
             <tr><td><strong>USDC</strong></td><td><code>0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913</code></td><td>6</td></tr>
+            <tr><td><strong>USDT</strong></td><td><code>0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2</code></td><td>6</td></tr>
+            <tr><td><strong>DAI</strong></td><td><code>0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb</code></td><td>18</td></tr>
             <tr><td><strong>ETH</strong></td><td>Native</td><td>18</td></tr>
             <tr><td><strong>WETH</strong></td><td><code>0x4200000000000000000000000000000000000006</code></td><td>18</td></tr>
-            <tr><td><strong>$BNKR</strong></td><td><code>0x22d...</code> (Base native)</td><td>18</td></tr>
+            <tr><td><strong>$BNKR</strong></td><td><code>0x22af33fe49fd1fa80c7149773dde5890d3c76f3b</code></td><td>18</td></tr>
           </tbody>
         </table>
 
@@ -79,54 +85,59 @@ export default function SkillPage() {
         <h2>Agent Integration</h2>
 
         <h3>1. Discover Leads</h3>
-        <pre><code>{`// Query available leads
-const leads = await fetch('http://100.65.229.34:3200/leads?category=defi&min_score=80');`}</code></pre>
+        <pre><code>{`// Browse all available leads (public, no auth)
+const res = await fetch('http://3.142.118.148:3200/leads');
+const { listings } = await res.json();
 
-        <h3>2. Request Quote</h3>
-        <pre><code>{`// Get pricing for specific lead
-const quote = await fetch('http://100.65.229.34:3200/quote?id=lead_123');
-// Returns: { price: "50", token: "USDC", expires_at: "..." }`}</code></pre>
+// Filter by category or minimum score
+const filtered = await fetch('http://3.142.118.148:3200/leads?category=defi&min_score=80');`}</code></pre>
 
-        <h3>3. Execute Payment (x402)</h3>
-        <pre><code>{`// Build x402 payment payload
+        <h3>2. Get Quote</h3>
+        <pre><code>{`// Get exact pricing for a specific lead
+const res = await fetch('http://3.142.118.148:3200/quote?id=poly-0xc2e7800b5a&token=USDC');
+// Returns: { lead_id, price, amount_raw, token_address, pay_to, expires_at }`}</code></pre>
+
+        <h3>3. Request Lead (x402 Flow)</h3>
+        <pre><code>{`// Request without payment → returns 402 with all accepted payment options
+const res = await fetch('http://3.142.118.148:3200/lead?id=poly-0xc2e7800b5a');
+// Status: 402 Payment Required
+// Body includes paymentRequirements with all accepted tokens
+
+// Request WITH payment → returns 200 with lead data
 const payment = {
-  scheme: "x402",
-  network: "base",
-  chain_id: 8453,
-  token: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", // USDC
-  amount: "50000000", // 50 USDC (6 decimals)
-  recipient: "0x2Fc8F99B6b503DD7BC4e0a31d7E81DfA04e521fB",
-  nonce: Date.now(),
-  expires: Math.floor(Date.now() / 1000) + 300 // 5 min expiry
+  accepted: {
+    scheme: "exact",
+    network: "eip155:8453",
+    amount: "500000", // 0.50 USDC (6 decimals)
+    asset: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    payTo: "0x2Fc8F99B6b503DD7BC4e0a31d7E81DfA04e521fB"
+  },
+  payload: {
+    from: "0xYourWallet...",
+    permit2Authorization: {
+      deadline: Math.floor(Date.now() / 1000) + 300
+    }
+  }
 };
 
-// Sign and send
-const response = await fetch(\`http://100.65.229.34:3200/lead?id=lead_123\`, {
-  method: 'GET',
-  headers: {
-    'X-Payment-Token': JSON.stringify(payment),
-    'Content-Type': 'application/json'
-  }
+const lead = await fetch('http://3.142.118.148:3200/lead?id=poly-0xc2e7800b5a', {
+  headers: { 'X-Payment-Token': JSON.stringify(payment) }
 });`}</code></pre>
 
         <h3>4. Receive Lead Data</h3>
         <pre><code>{`{
-  "lead_id": "lead_123",
-  "category": "defi",
-  "score": 87,
-  "chain": "base",
+  "lead_id": "poly-0xc2e7800b5a",
+  "title": "Top Polymarket Trader — 4M Volume",
+  "category": "Polymarket Trader",
+  "score": 94,
+  "tier": "elite",
+  "chain": "Base",
   "contacts": {
-    "twitter": "@project",
-    "github": "org/repo",
-    "email": "founder@project.com",
-    "discord": "invite_link"
+    "wallet_address": "0xc2e7...",
+    "polymarket_profile": "https://polymarket.com/profile/0xc2e7..."
   },
-  "signals": {
-    "contract_deployed": "0x...",
-    "liquidity_added": "2026-03-15",
-    "github_activity": "high"
-  },
-  "purchased_at": "2026-03-19T01:23:45Z",
+  "metadata": { ... },
+  "purchased_at": "2026-03-21T12:00:00Z",
   "transaction_hash": "0x..."
 }`}</code></pre>
 

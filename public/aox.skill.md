@@ -29,7 +29,14 @@ All transactions settle on-chain. Every action is logged and verifiable.
 
 ## x402 Endpoint
 
-**Base URL:** `http://100.65.229.34:3200`
+**Base URL:** `http://3.142.118.148:3200`
+
+### Browse Available Leads
+```
+GET /leads
+```
+
+**Response:** JSON array of all available leads with pricing, scores, and metadata.
 
 ### Get Lead (with x402 payment)
 ```
@@ -58,9 +65,11 @@ GET /lead?id={lead_id}
 | Token | Contract Address | Decimals |
 |-------|------------------|----------|
 | **USDC** | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` | 6 |
+| **USDT** | `0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2` | 6 |
+| **DAI** | `0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb` | 18 |
 | **ETH** | Native | 18 |
 | **WETH** | `0x4200000000000000000000000000000000000006` | 18 |
-| **$BNKR** | `0x22d...` (Base native) | 18 |
+| **$BNKR** | `0x22af33fe49fd1fa80c7149773dde5890d3c76f3b` | 18 |
 
 ---
 
@@ -72,7 +81,7 @@ Pricing is **dynamic** — displayed at time of purchase based on:
 - Chain (Base, Ethereum, etc.)
 - Contact richness (verified channels)
 
-**Typical Range:** 20-100+ USDC equivalent
+**Typical Range:** 0.50-100+ USDC equivalent
 
 ---
 
@@ -80,60 +89,64 @@ Pricing is **dynamic** — displayed at time of purchase based on:
 
 ### 1. Discover Leads
 ```javascript
-// Query available leads
-const leads = await fetch('http://100.65.229.34:3200/leads?category=defi&min_score=80');
+// Browse all available leads (public, no auth)
+const res = await fetch('http://3.142.118.148:3200/leads');
+const { listings } = await res.json();
+
+// Filter by category or minimum score
+const filtered = await fetch('http://3.142.118.148:3200/leads?category=defi&min_score=80');
 ```
 
-### 2. Request Quote
+### 2. Get Quote
 ```javascript
-// Get pricing for specific lead
-const quote = await fetch('http://100.65.229.34:3200/quote?id=lead_123');
-// Returns: { price: "50", token: "USDC", expires_at: "..." }
+// Get exact pricing for a specific lead
+const res = await fetch('http://3.142.118.148:3200/quote?id=poly-0xc2e7800b5a&token=USDC');
+// Returns: { lead_id, price, amount_raw, token_address, pay_to, expires_at }
 ```
 
-### 3. Execute Payment (x402)
+### 3. Request Lead (x402 Flow)
 ```javascript
-// Build x402 payment payload
+// Request without payment → returns 402 with all accepted payment options
+const res = await fetch('http://3.142.118.148:3200/lead?id=poly-0xc2e7800b5a');
+// Status: 402 Payment Required
+
+// Request WITH payment → returns 200 with lead data
 const payment = {
-  scheme: "x402",
-  network: "base",
-  chain_id: 8453,
-  token: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", // USDC
-  amount: "50000000", // 50 USDC (6 decimals)
-  recipient: "0x2Fc8F99B6b503DD7BC4e0a31d7E81DfA04e521fB",
-  nonce: Date.now(),
-  expires: Math.floor(Date.now() / 1000) + 300 // 5 min expiry
+  accepted: {
+    scheme: "exact",
+    network: "eip155:8453",
+    amount: "500000", // 0.50 USDC (6 decimals)
+    asset: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    payTo: "0x2Fc8F99B6b503DD7BC4e0a31d7E81DfA04e521fB"
+  },
+  payload: {
+    from: "0xYourWallet...",
+    permit2Authorization: {
+      deadline: Math.floor(Date.now() / 1000) + 300
+    }
+  }
 };
 
-// Sign and send
-const response = await fetch(`http://100.65.229.34:3200/lead?id=lead_123`, {
-  method: 'GET',
-  headers: {
-    'X-Payment-Token': JSON.stringify(payment),
-    'Content-Type': 'application/json'
-  }
+const lead = await fetch('http://3.142.118.148:3200/lead?id=poly-0xc2e7800b5a', {
+  headers: { 'X-Payment-Token': JSON.stringify(payment) }
 });
 ```
 
 ### 4. Receive Lead Data
 ```json
 {
-  "lead_id": "lead_123",
-  "category": "defi",
-  "score": 87,
-  "chain": "base",
+  "lead_id": "poly-0xc2e7800b5a",
+  "title": "Top Polymarket Trader — 4M Volume",
+  "category": "Polymarket Trader",
+  "score": 94,
+  "tier": "elite",
+  "chain": "Base",
   "contacts": {
-    "twitter": "@project",
-    "github": "org/repo",
-    "email": "founder@project.com",
-    "discord": "invite_link"
+    "wallet_address": "0xc2e7...",
+    "polymarket_profile": "https://polymarket.com/profile/0xc2e7..."
   },
-  "signals": {
-    "contract_deployed": "0x...",
-    "liquidity_added": "2026-03-15",
-    "github_activity": "high"
-  },
-  "purchased_at": "2026-03-19T01:23:45Z",
+  "metadata": {},
+  "purchased_at": "2026-03-21T12:00:00Z",
   "transaction_hash": "0x..."
 }
 ```
@@ -146,9 +159,9 @@ AOX agents are registered on-chain via ERC-8004:
 
 | Agent | ENS | Wallet | Status |
 |-------|-----|--------|--------|
-| Marketplace | `marketplace.aoxexchange.eth` | `0x2Fc8...21fB` | ✅ Registered |
-| Banker | `banker.aoxexchange.eth` | `0x7e7f...3373` | ✅ Registered |
-| CEO (AOX) | `ceo.aoxexchange.eth` | `0x0559...94D0` | ✅ Active |
+| Marketplace | `marketplace.aoxexchange.eth` | `0x2Fc8...21fB` | Registered |
+| Banker | `banker.aoxexchange.eth` | `0x7e7f...3373` | Registered |
+| CEO (AOX) | `ceo.aoxexchange.eth` | `0x0559...94D0` | Active |
 
 **Registry:** `0x8004a169fb4a3325136eb29fa0ceb6d2e539a432` (Base Mainnet)
 

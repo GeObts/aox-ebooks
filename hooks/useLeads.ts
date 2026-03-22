@@ -14,6 +14,7 @@ export interface UseLeadsReturn {
 }
 
 function normalizeLead(raw: Record<string, unknown>): Lead {
+  const meta = (raw.metadata as Record<string, unknown>) ?? {};
   return {
     id: (raw.id as string) ?? (raw._id as string) ?? '',
     category: (raw.category as string) ?? 'Misc',
@@ -25,13 +26,13 @@ function normalizeLead(raw: Record<string, unknown>): Lead {
       ? (raw.tier as 'standard' | 'premium' | 'enterprise' | 'elite')
       : 'standard',
     wallet_age: (raw.wallet_age as string) ?? '',
-    liquidity: (raw.liquidity as string) ?? '',
-    contacts: Number(raw.contacts) || 0,
-    chain: (raw.chain as string) ?? 'Base',
-    timestamp: (raw.timestamp as string) ?? new Date().toISOString(),
+    liquidity: (raw.liquidity as string) ?? (meta.liquidity_reserve ? `$${Number(meta.liquidity_reserve).toLocaleString()}` : ''),
+    contacts: Number(raw.contacts) || Number(meta.unique_buyers) || 0,
+    chain: (raw.chain as string) ?? (meta.chain as string) ?? 'Base',
+    timestamp: (raw.timestamp as string) ?? (raw.listed_at as string) ?? new Date().toISOString(),
     win_rate: raw.win_rate as string | undefined,
-    volume: raw.volume as string | undefined,
-    markets: raw.markets !== undefined ? Number(raw.markets) : undefined,
+    volume: (raw.volume as string) ?? (meta.volume_24h ? `$${Number(meta.volume_24h).toLocaleString()}` : undefined),
+    markets: raw.markets !== undefined ? Number(raw.markets) : (meta.transactions !== undefined ? Number(meta.transactions) : undefined),
   };
 }
 

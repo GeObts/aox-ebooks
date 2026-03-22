@@ -138,6 +138,7 @@ export default function Marketplace() {
       <nav>
         <Link href="/" className="nav-logo">A<span>O</span>X</Link>
         <div className="nav-right">
+          <Link href="/skill" style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--muted)', textDecoration: 'none', letterSpacing: '0.05em' }}>skill.md</Link>
           <div className="nav-status">
             <div className="status-dot" />
             MARKETPLACE LIVE
@@ -186,6 +187,7 @@ export default function Marketplace() {
         <Link href="/marketplace/dao" className="filter-btn">DAO</Link>
         <Link href="/marketplace/misc" className="filter-btn">MISC</Link>
         <Link href="/marketplace/polymarket" className="filter-btn">POLYMARKET</Link>
+        <Link href="/marketplace/jobs" className="filter-btn">JOBS</Link>
         <Link href="/ebooks" className="filter-btn">EBOOKS {'\u2197'}</Link>
         <span className="filter-count">{leads.length} leads</span>
       </div>
@@ -211,9 +213,15 @@ export default function Marketplace() {
             <div className="lead-title">{lead.title}</div>
             <div className="lead-desc">{lead.desc}</div>
             <div className="lead-meta">
-              <div className="meta-item"><div className="meta-dot" />{lead.wallet_age} wallet</div>
-              <div className="meta-item"><div className="meta-dot" />{lead.liquidity} liquidity</div>
-              <div className="meta-item"><div className="meta-dot" />{lead.contacts} contacts</div>
+              {lead.wallet_age && (
+                <div className="meta-item"><div className="meta-dot" />{lead.wallet_age} wallet</div>
+              )}
+              {lead.liquidity && (
+                <div className="meta-item"><div className="meta-dot" />{lead.liquidity} liquidity</div>
+              )}
+              {lead.contacts > 0 && (
+                <div className="meta-item"><div className="meta-dot" />{lead.contacts} contacts</div>
+              )}
               <div className="meta-item"><div className="meta-dot" />{timeAgo(lead.timestamp)}</div>
               {lead.win_rate && (
                 <div className="meta-item"><div className="meta-dot" />{lead.win_rate} win rate</div>
@@ -232,10 +240,9 @@ export default function Marketplace() {
               </div>
               <button
                 className="buy-btn"
-                disabled
-                style={{ background: 'var(--dark3)', color: 'var(--muted)', border: '1px solid var(--border)', cursor: 'not-allowed' }}
+                onClick={() => openModal(lead.id)}
               >
-                Coming Soon
+                Buy {lead.price} USDC
               </button>
             </div>
           </div>
@@ -281,6 +288,7 @@ export default function Marketplace() {
         <div style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--muted)' }}>A<span style={{ color: 'var(--orange)' }}>O</span>X {'\u2014'} AGENT OPPORTUNITY EXCHANGE</div>
         <div style={{ display: 'flex', gap: '24px', fontFamily: 'var(--mono)', fontSize: '11px' }}>
           <Link href="/" style={{ color: 'var(--muted)', textDecoration: 'none', letterSpacing: '0.1em' }}>HOME</Link>
+          <Link href="/skill" style={{ color: 'var(--muted)', textDecoration: 'none', letterSpacing: '0.1em' }}>SKILL.MD</Link>
           <a href="mailto:aox@agentmail.to" style={{ color: 'var(--muted)', textDecoration: 'none', letterSpacing: '0.1em' }}>aox@agentmail.to</a>
           <a href="https://x.com/AOXexchange" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--muted)', textDecoration: 'none', letterSpacing: '0.1em' }}>TWITTER</a>
         </div>
@@ -411,10 +419,13 @@ export default function Marketplace() {
 
           {modalStep === 'success' && currentLead && !reveal && (
             <div style={{ textAlign: 'center', padding: '40px 0' }}>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '13px', color: '#ff5050', marginBottom: '12px' }}>DELIVERY ERROR</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '13px', color: 'var(--green)', marginBottom: '12px' }}>PAYMENT CONFIRMED</div>
               <div style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--muted)', marginBottom: '8px', lineHeight: 1.7 }}>
-                Payment confirmed, but lead data could not be loaded.<br />
-                Please retry retrieval or contact support.
+                Your payment has been confirmed on Base.<br />
+                Lead details will be delivered to your connected wallet address.
+              </div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--muted)', marginBottom: '8px', lineHeight: 1.7 }}>
+                Contact <a href="mailto:aox@agentmail.to" style={{ color: 'var(--orange)' }}>aox@agentmail.to</a> with your tx hash for expedited delivery.
               </div>
               {txHash && (
                 <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--muted)', marginBottom: '24px', wordBreak: 'break-all' }}>
