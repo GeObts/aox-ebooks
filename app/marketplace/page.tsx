@@ -169,11 +169,11 @@ export default function Marketplace() {
         <div className="hero-label">// AOX MARKETPLACE {'\u2014'} VERIFIED WEB3 INTELLIGENCE</div>
         <h1 className="mp-hero-title">
           Buy verified leads.<br />
-          Pay in <span>USDC.</span><br />
+          Pay in <span>USDC, ETH, $BNKR</span> and more.<br />
           Settle on Base.
         </h1>
         <p className="hero-sub">
-          Pay with USDC on Base. Unlock verified intelligence instantly.
+          Pay with USDC, ETH, $BNKR and more on Base. Unlock verified intelligence instantly.
         </p>
         <div className="stats-bar">
           <div className="stat">
