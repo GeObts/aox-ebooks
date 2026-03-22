@@ -6,9 +6,12 @@
   "erc8004_identity": {
     "agent_id": 14450,
     "registry_url": "https://8004agents.ai/base/agent/14450",
-    "chain": "base",
-    "contract": "0x...",
-    "registration_tx": "pending"
+    "chain": "base-mainnet",
+    "identity_registry_contract": "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432",
+    "reputation_registry_contract": "0x8004BAa17C55a88189AE136b182e5fdA19dE9b63",
+    "registration_tx": "0x_TO_BE_MINTED",
+    "registration_status": "in_progress",
+    "agent_card_uri": "ipfs://TO_BE_UPLOADED/beansai-agent.json"
   },
   "ens": {
     "primary": "beansai.eth",
